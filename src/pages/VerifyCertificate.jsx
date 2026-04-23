@@ -1,38 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { MOCK_CERTIFICADOS } from '../utils/mockData';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
-import { ShieldCheck, Search, CheckCircle2, XCircle, AlertTriangle, Hash, KeyRound, LogIn } from 'lucide-react';
-import { formatDate, getStatusClass, getStatusLabel } from '../utils/helpers';
+import { ShieldCheck, Search, CheckCircle2, XCircle, AlertTriangle, Upload, Link2, Fingerprint, Globe, Lock, KeyRound, Hash } from 'lucide-react';
+import { formatDate } from '../utils/helpers';
 import './VerifyCertificate.css';
 
-const SEARCH_MODES = [
-  { key: 'codigo', label: 'Código único', icon: KeyRound, placeholder: 'Ej. A3F2B91C4D7E0812' },
-  { key: 'hash', label: 'Hash SHA-256', icon: Hash, placeholder: 'Ej. e3b0c44298fc1c149afb...' },
+const MODES = [
+  { key: 'codigo', label: 'Código único', icon: KeyRound, placeholder: 'Ej. A3F2B91C4D7E0812  —  prueba también con B7D1E4A9F2C30516 o C5E8F1B3D6A90724' },
+  { key: 'hash',   label: 'Hash SHA-256',  icon: Hash,     placeholder: 'Ej. e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' },
 ];
 
+const HOW_IT_WORKS = [
+  { icon: Link2,       title: 'Blockchain Inmutable',  desc: 'Cada certificado se registra en una red blockchain, garantizando que no pueda ser alterado.' },
+  { icon: Fingerprint, title: 'Hash SHA-256',          desc: 'Se genera una huella digital única para cada documento, detectando cualquier modificación.' },
+  { icon: Globe,       title: 'Verificación Pública',  desc: 'Cualquier persona puede verificar un certificado sin necesidad de cuenta o registro.' },
+  { icon: Lock,        title: 'Protección de Datos',   desc: 'Cumplimiento con la normativa de protección de datos vigente en Colombia.' },
+];
+
+function ResultCard({ result }) {
+  const isValid   = result.estado === 'valido';
+  const isRevoked = result.estado === 'revocado';
+  const notFound  = result.estado === 'no_encontrado';
+  const IconComp  = isValid ? CheckCircle2 : (notFound ? AlertTriangle : XCircle);
+  const iconColor = isValid ? '#10b981' : (notFound ? '#f59e0b' : '#ef4444');
+
+  return (
+    <div className={`result-card glass-panel ${isValid ? 'res-valid' : notFound ? 'res-not-found' : 'res-invalid'}`}>
+      <div className="result-icon-col">
+        <IconComp size={46} style={{ color: iconColor }} />
+      </div>
+      <div className="result-info-col">
+        <h3 style={{ color: iconColor }}>{result.mensaje}</h3>
+        {!notFound && (
+          <div className="result-details-grid">
+            <div><span>Código único</span><strong style={{ fontFamily: 'monospace' }}>{result.codigo_unico}</strong></div>
+            {result.estudiante && <div><span>Receptor</span><strong>{result.estudiante.nombre} {result.estudiante.apellido} — Doc. {result.estudiante.documento}</strong></div>}
+            {result.institucion && <div><span>Institución</span><strong>{result.institucion.nombre}</strong></div>}
+            {result.plantilla && <div><span>Acreditación</span><strong>{result.plantilla.nombre}</strong></div>}
+            <div><span>Emisión</span><strong>{formatDate(result.fecha_emision)}</strong></div>
+            {result.fecha_expiracion && <div><span>Expira</span><strong>{formatDate(result.fecha_expiracion)}</strong></div>}
+            <div className="hash-row">
+              <span>SHA-256</span>
+              <strong style={{ fontFamily: 'monospace', wordBreak: 'break-all', fontSize: '0.78rem' }}>{result.hash_sha256}</strong>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export const VerifyCertificate = () => {
-  const [mode, setMode] = useState('codigo');
-  const [query, setQuery] = useState('');
-  const [result, setResult] = useState(null);
+  const [mode, setMode]       = useState('codigo');
+  const [query, setQuery]     = useState('');
+  const [result, setResult]   = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const fileRef = useRef(null);
 
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  const verify = async (code, searchMode) => {
     setLoading(true);
-    setError('');
     setResult(null);
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 700));
 
+    const q = code.trim();
     let found;
-    if (mode === 'codigo') {
-      found = MOCK_CERTIFICADOS.find(c => c.codigo_unico === query.trim().toUpperCase());
+    if (searchMode === 'codigo') {
+      found = q.toUpperCase() === 'DEMO'
+        ? MOCK_CERTIFICADOS[0]
+        : MOCK_CERTIFICADOS.find(c => c.codigo_unico === q.toUpperCase());
     } else {
-      found = MOCK_CERTIFICADOS.find(c => c.hash_sha256 === query.trim());
+      found = MOCK_CERTIFICADOS.find(c => c.hash_sha256 === q);
     }
 
     if (found) {
@@ -43,128 +80,146 @@ export const VerifyCertificate = () => {
           : found.estado === 'revocado'
           ? 'Este certificado ha sido revocado'
           : 'Este certificado ha expirado',
-        hash_verificado: true,
       });
     } else {
-      setResult({
-        estado: 'no_encontrado',
-        mensaje: 'No se encontró ningún certificado con ese ' + (mode === 'codigo' ? 'código' : 'hash') + '.',
-      });
+      setResult({ estado: 'no_encontrado', mensaje: `No se encontró ningún certificado con ese ${searchMode === 'codigo' ? 'código' : 'hash'}.` });
     }
     setLoading(false);
   };
 
-  const handleModeChange = (m) => {
-    setMode(m);
-    setQuery('');
-    setResult(null);
-    setError('');
+  const handleSubmit = (e) => { e.preventDefault(); if (query.trim()) verify(query, mode); };
+
+  const handleModeChange = (m) => { setMode(m); setQuery(''); setResult(null); };
+
+  const handlePdf = (e) => {
+    if (!e.target.files?.[0]) return;
+    verify(MOCK_CERTIFICADOS[1].codigo_unico, 'codigo');
+    e.target.value = '';
   };
 
-  const getIcon = () => {
-    if (!result) return null;
-    if (result.estado === 'valido') return <CheckCircle2 size={48} className="icon-success" />;
-    if (result.estado === 'revocado') return <XCircle size={48} className="icon-error" />;
-    if (result.estado === 'expirado') return <AlertTriangle size={48} className="icon-warning" />;
-    return <XCircle size={48} className="icon-error" />;
-  };
+  const scrollToVerify = () => document.getElementById('verificar')?.scrollIntoView({ behavior: 'smooth' });
 
-  const activePlaceholder = SEARCH_MODES.find(m => m.key === mode)?.placeholder;
+  const activePlaceholder = MODES.find(m => m.key === mode)?.placeholder;
 
   return (
-    <div className="verify-public-page">
-      {/* Top nav */}
-      <nav className="verify-topnav">
-        <div className="verify-nav-brand">
-          <ShieldCheck size={20} style={{ color: 'var(--color-primary)' }} />
+    <div className="landing-page">
+
+      {/* ── Navbar ─────────────────────────── */}
+      <nav className="landing-nav">
+        <div className="nav-brand">
+          <ShieldCheck size={20} />
           <span>CertiValidate</span>
         </div>
-        <Link to="/login" className="verify-nav-login">
-          <LogIn size={16} />
-          Iniciar sesión
-        </Link>
+        <div className="nav-actions">
+          <button className="nav-btn-ghost" onClick={scrollToVerify}>
+            <ShieldCheck size={14} />
+            Verificar Certificado
+          </button>
+          <Link to="/login" className="nav-btn-acceder">Acceder</Link>
+        </div>
       </nav>
 
-      <div className="verify-hero animate-fade-in">
-        <ShieldCheck size={48} className="hero-icon" />
-        <h1>Verificar Certificado</h1>
-        <p>Comprueba la autenticidad e integridad de cualquier certificado emitido por la plataforma.</p>
-      </div>
-
-      {/* Mode selector */}
-      <div className="verify-mode-tabs animate-fade-in">
-        {SEARCH_MODES.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            className={`mode-tab ${mode === key ? 'active' : ''}`}
-            onClick={() => handleModeChange(key)}
-          >
-            <Icon size={16} />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <form onSubmit={handleVerify} className="verify-search animate-fade-in">
-        <div className="search-bar glass-panel">
-          <input
-            type="text"
-            placeholder={activePlaceholder}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-          />
-          <Button type="submit" variant="primary" icon={<Search size={18} />} disabled={loading}>
-            {loading ? 'Verificando...' : 'Verificar'}
-          </Button>
-        </div>
-        {mode === 'codigo' && (
-          <p className="verify-hint">El código de 16 caracteres aparece en el certificado impreso o digital.</p>
-        )}
-        {mode === 'hash' && (
-          <p className="verify-hint">El hash SHA-256 garantiza la integridad del documento PDF.</p>
-        )}
-      </form>
-
-      {error && <div className="alert alert-error" style={{ maxWidth: 700, margin: '0 auto 1rem' }}>{error}</div>}
-
-      {result && (
-        <Card
-          className={`verify-result animate-fade-in ${result.estado === 'valido' ? 'valid' : result.estado === 'no_encontrado' ? 'not-found' : 'invalid'}`}
-          glow={result.estado === 'valido'}
-        >
-          <div className="result-icon-container">{getIcon()}</div>
-          <div className="result-details">
-            <h3>{result.mensaje}</h3>
-            {result.estado !== 'no_encontrado' && (
-              <>
-                <Badge variant={getStatusClass(result.estado).replace('badge-', '')} style={{ marginBottom: '1rem' }}>
-                  {getStatusLabel(result.estado)}
-                </Badge>
-                <div className="details-list">
-                  <div><strong>Código único:</strong> <span style={{ fontFamily: 'monospace' }}>{result.codigo_unico}</span></div>
-                  {result.estudiante && (
-                    <div><strong>Receptor:</strong> {result.estudiante.nombre} {result.estudiante.apellido} — Doc. {result.estudiante.documento}</div>
-                  )}
-                  {result.institucion && <div><strong>Institución emisora:</strong> {result.institucion.nombre}</div>}
-                  {result.plantilla && <div><strong>Acreditación:</strong> {result.plantilla.nombre}</div>}
-                  <div><strong>Fecha de emisión:</strong> {formatDate(result.fecha_emision)}</div>
-                  {result.fecha_expiracion && <div><strong>Expira:</strong> {formatDate(result.fecha_expiracion)}</div>}
-                  <div>
-                    <strong>Integridad del documento:</strong>{' '}
-                    {result.hash_verificado
-                      ? <span style={{ color: 'var(--color-success)' }}>✅ Hash verificado — documento íntegro</span>
-                      : <span style={{ color: 'var(--color-error)' }}>❌ Hash no coincide — documento comprometido</span>
-                    }
-                  </div>
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                    <strong>SHA-256:</strong> <span style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>{result.hash_sha256}</span>
-                  </div>
-                </div>
-              </>
-            )}
+      {/* ── Hero ──────────────────────────── */}
+      <section className="hero-section">
+        <div className="hero-inner animate-fade-in">
+          <div className="hero-badge-pill">
+            <ShieldCheck size={13} />
+            Verificación respaldada por Blockchain
           </div>
-        </Card>
-      )}
+          <h1 className="hero-title">
+            Certificados Académicos<br />
+            <span className="hero-highlight">Verificables</span>
+          </h1>
+          <p className="hero-desc">
+            Verifica la autenticidad de cualquier certificado académico emitido por la
+            institución en segundos. Seguro, transparente e inmutable.
+          </p>
+          <div className="hero-features-row">
+            <span><Link2 size={13} /> Registro en Blockchain</span>
+            <span><Fingerprint size={13} /> Hash SHA-256</span>
+            <span><ShieldCheck size={13} /> Verificación Pública</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Verificar ─────────────────────── */}
+      <section id="verificar" className="verify-section">
+        <div className="verify-inner animate-fade-in">
+          <h2 className="verify-title">
+            Verificar <span className="hero-highlight">Certificado</span>
+          </h2>
+          <p className="verify-subtitle">
+            Ingresa el código único del certificado o sube el archivo PDF
+          </p>
+
+          {/* Mode tabs */}
+          <div className="verify-mode-tabs">
+            {MODES.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                className={`mode-tab ${mode === key ? 'active' : ''}`}
+                onClick={() => handleModeChange(key)}
+              >
+                <Icon size={15} />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSubmit} className="verify-form">
+            <div className="verify-input-wrap glass-panel">
+              <Search size={16} className="vi-icon" />
+              <input
+                type="text"
+                className="verify-input"
+                placeholder={activePlaceholder}
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+              />
+            </div>
+            <div className="verify-btn-row">
+              <button type="submit" className="btn-verify" disabled={loading || !query.trim()}>
+                <Search size={16} />
+                {loading ? 'Verificando...' : 'Verificar'}
+              </button>
+              <button type="button" className="btn-upload" onClick={() => fileRef.current?.click()}>
+                <Upload size={16} />
+                Subir PDF
+              </button>
+              <input ref={fileRef} type="file" accept=".pdf" style={{ display: 'none' }} onChange={handlePdf} />
+            </div>
+          </form>
+
+          {mode === 'codigo' && !result && (
+            <p className="verify-hint">El código de 16 caracteres aparece en el certificado impreso o digital.</p>
+          )}
+          {mode === 'hash' && !result && (
+            <p className="verify-hint">El hash SHA-256 garantiza la integridad del documento PDF.</p>
+          )}
+
+          {result && <ResultCard result={result} />}
+        </div>
+      </section>
+
+      {/* ── Cómo funciona ─────────────────── */}
+      <section className="hiw-section">
+        <div className="hiw-inner">
+          <h2 className="hiw-title">¿Cómo funciona?</h2>
+          <div className="hiw-grid">
+            {HOW_IT_WORKS.map(({ icon: Icon, title, desc }) => (
+              <div key={title} className="hiw-card glass-panel">
+                <div className="hiw-icon-wrap">
+                  <Icon size={28} />
+                </div>
+                <h3>{title}</h3>
+                <p>{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
     </div>
   );
 };

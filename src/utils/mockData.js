@@ -64,13 +64,13 @@ export const MOCK_PLANTILLAS = [
 ];
 
 export const MOCK_CERTIFICADOS = [
-  { id: 'cert-001', estudiante_id: 'est-001', institucion_id: 'inst-001', plantilla_id: 'plt-001', codigo_unico: 'A3F2B91C4D7E0812', estado: 'valido', fecha_emision: '2026-01-15T10:00:00Z', fecha_expiracion: null, hash_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', created_at: '2026-01-15T10:00:00Z', estudiante: { nombre: 'Ana', apellido: 'Martínez', documento: '1023456789' }, institucion: { nombre: 'Universidad Central de Colombia' }, plantilla: { nombre: 'Certificado de Finalización' } },
-  { id: 'cert-002', estudiante_id: 'est-002', institucion_id: 'inst-001', plantilla_id: 'plt-002', codigo_unico: 'B7D1E4A9F2C30516', estado: 'valido', fecha_emision: '2026-02-10T14:30:00Z', fecha_expiracion: '2027-02-10T00:00:00Z', hash_sha256: 'abc123def456789...', created_at: '2026-02-10T14:30:00Z', estudiante: { nombre: 'Luis', apellido: 'Rodríguez', documento: '1098765432' }, institucion: { nombre: 'Universidad Central de Colombia' }, plantilla: { nombre: 'Diploma de Excelencia' } },
-  { id: 'cert-003', estudiante_id: 'est-004', institucion_id: 'inst-002', plantilla_id: 'plt-003', codigo_unico: 'C5E8F1B3D6A90724', estado: 'revocado', fecha_emision: '2025-11-20T09:00:00Z', fecha_expiracion: null, hash_sha256: 'def789abc123456...', created_at: '2025-11-20T09:00:00Z', estudiante: { nombre: 'Diego', apellido: 'Torres', documento: '1045678912' }, institucion: { nombre: 'Instituto Tecnológico del Valle' }, plantilla: { nombre: 'Constancia de Participación' } },
-  { id: 'cert-004', estudiante_id: 'est-003', institucion_id: 'inst-001', plantilla_id: 'plt-001', codigo_unico: 'D2A4C6E8F0B17935', estado: 'valido', fecha_emision: '2026-03-05T11:15:00Z', fecha_expiracion: null, hash_sha256: 'fgh456jkl012mno...', created_at: '2026-03-05T11:15:00Z', estudiante: { nombre: 'Sofía', apellido: 'Herrera', documento: '1034567891' }, institucion: { nombre: 'Universidad Central de Colombia' }, plantilla: { nombre: 'Certificado de Finalización' } },
-  { id: 'cert-005', estudiante_id: 'est-005', institucion_id: 'inst-002', plantilla_id: 'plt-004', codigo_unico: 'E9F3A7B1C5D20846', estado: 'valido', fecha_emision: '2026-03-18T16:00:00Z', fecha_expiracion: '2027-03-18T00:00:00Z', hash_sha256: 'pqr789stu345vwx...', created_at: '2026-03-18T16:00:00Z', estudiante: { nombre: 'Valentina', apellido: 'Jiménez', documento: '1056789123' }, institucion: { nombre: 'Instituto Tecnológico del Valle' }, plantilla: { nombre: 'Certificado Técnico' } },
-  { id: 'cert-006', estudiante_id: 'est-006', institucion_id: 'inst-001', plantilla_id: 'plt-002', codigo_unico: 'F1B5D9E3A7C40258', estado: 'valido', fecha_emision: '2026-04-01T08:45:00Z', fecha_expiracion: null, hash_sha256: 'yza012bcd345efg...', created_at: '2026-04-01T08:45:00Z', estudiante: { nombre: 'Camilo', apellido: 'Vargas', documento: '1067891234' }, institucion: { nombre: 'Universidad Central de Colombia' }, plantilla: { nombre: 'Diploma de Excelencia' } },
-  { id: 'cert-007', estudiante_id: 'est-007', institucion_id: 'inst-002', plantilla_id: 'plt-003', codigo_unico: 'G4H8K2L6M0N35769', estado: 'valido', fecha_emision: '2026-04-10T13:20:00Z', fecha_expiracion: null, hash_sha256: 'hij678klm901nop...', created_at: '2026-04-10T13:20:00Z', estudiante: { nombre: 'Isabella', apellido: 'Moreno', documento: '1078912345' }, institucion: { nombre: 'Instituto Tecnológico del Valle' }, plantilla: { nombre: 'Constancia de Participación' } },
+  { id: 'cert-001', estudiante_id: 'est-001', institucion_id: 'inst-001', plantilla_id: 'plt-001', codigo_unico: 'A3F2B91C4D7E0812', estado: 'valido',   fecha_emision: '2026-01-15T10:00:00Z', fecha_expiracion: null,                  hash_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', created_at: '2026-01-15T10:00:00Z', estudiante: { nombre: 'Ana',       apellido: 'Martínez', documento: '1023456789' }, institucion: { nombre: 'Universidad Central de Colombia'   }, plantilla: { nombre: 'Certificado de Finalización'  } },
+  { id: 'cert-002', estudiante_id: 'est-002', institucion_id: 'inst-001', plantilla_id: 'plt-002', codigo_unico: 'B7D1E4A9F2C30516', estado: 'valido',   fecha_emision: '2026-02-10T14:30:00Z', fecha_expiracion: '2027-02-10T00:00:00Z', hash_sha256: 'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3', created_at: '2026-02-10T14:30:00Z', estudiante: { nombre: 'Luis',      apellido: 'Rodríguez', documento: '1098765432' }, institucion: { nombre: 'Universidad Central de Colombia'   }, plantilla: { nombre: 'Diploma de Excelencia'         } },
+  { id: 'cert-003', estudiante_id: 'est-004', institucion_id: 'inst-002', plantilla_id: 'plt-003', codigo_unico: 'C5E8F1B3D6A90724', estado: 'revocado', fecha_emision: '2025-11-20T09:00:00Z', fecha_expiracion: null,                  hash_sha256: '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824', created_at: '2025-11-20T09:00:00Z', estudiante: { nombre: 'Diego',     apellido: 'Torres',    documento: '1045678912' }, institucion: { nombre: 'Instituto Tecnológico del Valle'   }, plantilla: { nombre: 'Constancia de Participación'  } },
+  { id: 'cert-004', estudiante_id: 'est-003', institucion_id: 'inst-001', plantilla_id: 'plt-001', codigo_unico: 'D2A4C6E8F0B17935', estado: 'valido',   fecha_emision: '2026-03-05T11:15:00Z', fecha_expiracion: null,                  hash_sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', created_at: '2026-03-05T11:15:00Z', estudiante: { nombre: 'Sofía',     apellido: 'Herrera',   documento: '1034567891' }, institucion: { nombre: 'Universidad Central de Colombia'   }, plantilla: { nombre: 'Certificado de Finalización'  } },
+  { id: 'cert-005', estudiante_id: 'est-005', institucion_id: 'inst-002', plantilla_id: 'plt-004', codigo_unico: 'E9F3A7B1C5D20846', estado: 'valido',   fecha_emision: '2026-03-18T16:00:00Z', fecha_expiracion: '2027-03-18T00:00:00Z', hash_sha256: '5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5', created_at: '2026-03-18T16:00:00Z', estudiante: { nombre: 'Valentina', apellido: 'Jiménez',   documento: '1056789123' }, institucion: { nombre: 'Instituto Tecnológico del Valle'   }, plantilla: { nombre: 'Certificado Técnico'           } },
+  { id: 'cert-006', estudiante_id: 'est-006', institucion_id: 'inst-001', plantilla_id: 'plt-002', codigo_unico: 'F1B5D9E3A7C40258', estado: 'valido',   fecha_emision: '2026-04-01T08:45:00Z', fecha_expiracion: null,                  hash_sha256: 'bf9d2f17b592b6c748ee1b8b3c5ffbcfbbd1ef6c6a3b5cdc55b50cce9e3451a', created_at: '2026-04-01T08:45:00Z', estudiante: { nombre: 'Camilo',    apellido: 'Vargas',    documento: '1067891234' }, institucion: { nombre: 'Universidad Central de Colombia'   }, plantilla: { nombre: 'Diploma de Excelencia'         } },
+  { id: 'cert-007', estudiante_id: 'est-007', institucion_id: 'inst-002', plantilla_id: 'plt-003', codigo_unico: 'G4H8K2L6M0N35769', estado: 'valido',   fecha_emision: '2026-04-10T13:20:00Z', fecha_expiracion: null,                  hash_sha256: '7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069', created_at: '2026-04-10T13:20:00Z', estudiante: { nombre: 'Isabella',  apellido: 'Moreno',    documento: '1078912345' }, institucion: { nombre: 'Instituto Tecnológico del Valle'   }, plantilla: { nombre: 'Constancia de Participación'  } },
 ];
 
 export const MOCK_ESTADISTICAS = {
@@ -91,7 +91,31 @@ export const MOCK_AUDITORIA = [
 
 // Role permission map
 export const ROLE_PERMISSIONS = {
-  admin: ['certificado:emitir', 'certificado:revocar', 'certificado:listar', 'certificado:ver', 'certificado:descargar', 'estudiante:crear', 'estudiante:actualizar', 'estudiante:eliminar', 'estudiante:listar', 'estudiante:ver', 'institucion:actualizar', 'institucion:ver', 'institucion:estadisticas', 'plantilla:crear', 'plantilla:actualizar', 'plantilla:archivar', 'plantilla:ver', 'plantilla:listar', 'auditoria:ver'],
-  editor: ['certificado:emitir', 'certificado:revocar', 'certificado:listar', 'certificado:ver', 'certificado:descargar', 'estudiante:crear', 'estudiante:actualizar', 'estudiante:listar', 'estudiante:ver', 'institucion:ver', 'institucion:estadisticas', 'plantilla:crear', 'plantilla:actualizar', 'plantilla:archivar', 'plantilla:ver', 'plantilla:listar', 'auditoria:ver'],
-  lector: ['certificado:listar', 'certificado:ver', 'certificado:descargar', 'estudiante:listar', 'estudiante:ver', 'institucion:ver', 'institucion:estadisticas', 'plantilla:ver', 'plantilla:listar', 'auditoria:ver'],
+  admin: ['certificado:emitir', 'certificado:revocar', 'certificado:listar', 'certificado:ver', 'certificado:descargar', 'estudiante:crear', 'estudiante:actualizar', 'estudiante:eliminar', 'estudiante:listar', 'estudiante:ver', 'institucion:actualizar', 'institucion:ver', 'institucion:estadisticas', 'plantilla:crear', 'plantilla:actualizar', 'plantilla:archivar', 'plantilla:ver', 'plantilla:listar', 'auditoria:ver', 'usuario:listar', 'usuario:crear', 'usuario:actualizar', 'usuario:eliminar'],
+  editor: ['certificado:emitir', 'certificado:revocar', 'certificado:listar', 'certificado:ver', 'certificado:descargar', 'estudiante:crear', 'estudiante:actualizar', 'estudiante:listar', 'estudiante:ver', 'institucion:ver', 'institucion:estadisticas'],
+  lector: ['certificado:listar', 'certificado:ver', 'certificado:descargar', 'estudiante:listar', 'estudiante:ver', 'institucion:ver', 'institucion:estadisticas'],
 };
+
+export const MOCK_SYSTEM_USERS = [
+  { id: 'su-001', nombre: 'Administrador', apellido: 'Principal', email: 'admin@unicesar.edu.co', rol: 'admin', activo: true },
+  { id: 'su-002', nombre: 'Juan', apellido: 'Emisor', email: 'emisor@unicesar.edu.co', rol: 'editor', activo: true },
+  { id: 'su-003', nombre: 'Laura', apellido: 'Validadora', email: 'validador@unicesar.edu.co', rol: 'lector', activo: true },
+  { id: 'su-004', nombre: 'Pedro', apellido: 'García', email: 'pgarcia@unicesar.edu.co', rol: 'editor', activo: false },
+];
+
+export const MOCK_ACTIVIDAD_RECIENTE = [
+  { id: 1, tipo: 'emision', titulo: 'Certificado emitido', desc: 'María López — Ing. Sistemas', tiempo: 'Hace 5 min', color: '#10b981' },
+  { id: 2, tipo: 'verificacion', titulo: 'Verificación exitosa', desc: 'Código: CV-2026-0847', tiempo: 'Hace 12 min', color: '#00f0ff' },
+  { id: 3, tipo: 'revocacion', titulo: 'Certificado revocado', desc: 'Carlos Ruiz — Derecho', tiempo: 'Hace 1 hora', color: '#ef4444' },
+  { id: 4, tipo: 'usuario', titulo: 'Nuevo usuario creado', desc: 'emisor@unicesar.edu.co', tiempo: 'Hace 2 horas', color: '#3b82f6' },
+  { id: 5, tipo: 'fallo', titulo: 'Verificación fallida', desc: 'Código inválido detectado', tiempo: 'Hace 3 horas', color: '#f59e0b' },
+];
+
+export const MOCK_MONTHLY_DATA = [
+  { mes: 'Ene', emisiones: 80, verificaciones: 170 },
+  { mes: 'Feb', emisiones: 100, verificaciones: 175 },
+  { mes: 'Mar', emisiones: 300, verificaciones: 310 },
+  { mes: 'Abr', emisiones: 130, verificaciones: 140 },
+  { mes: 'May', emisiones: 350, verificaciones: 490 },
+  { mes: 'Jun', emisiones: 150, verificaciones: 450 },
+];

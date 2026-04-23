@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FileBadge, Users, Building2, FileText,
-  ScrollText, ShieldCheck, LogOut, ChevronLeft, ChevronRight, User
+  ScrollText, ShieldCheck, LogOut, ChevronLeft, ChevronRight, User, UserCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import './Sidebar.css';
@@ -11,6 +11,7 @@ const allNavItems = [
   { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, permission: null },
   { path: '/admin/certificados', icon: FileBadge, label: 'Certificados', permission: 'certificado:listar' },
   { path: '/admin/estudiantes', icon: Users, label: 'Estudiantes', permission: 'estudiante:listar' },
+  { path: '/admin/usuarios', icon: UserCheck, label: 'Usuarios', permission: 'usuario:listar' },
   { path: '/admin/plantillas', icon: FileText, label: 'Plantillas', permission: 'plantilla:listar' },
   { path: '/admin/instituciones', icon: Building2, label: 'Instituciones', permission: 'institucion:ver' },
   { path: '/admin/auditoria', icon: ScrollText, label: 'Auditoría', permission: 'auditoria:ver' },
@@ -18,7 +19,7 @@ const allNavItems = [
 
 const ROLE_META = {
   admin: { label: 'Administrador', color: '#00f0ff' },
-  editor: { label: 'Editor', color: '#b026ff' },
+  editor: { label: 'Emisor', color: '#b026ff' },
   lector: { label: 'Lector', color: '#38bdf8' },
 };
 

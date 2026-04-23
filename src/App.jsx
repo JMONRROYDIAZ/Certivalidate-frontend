@@ -12,6 +12,7 @@ import { PlantillasPage } from './pages/admin/PlantillasPage';
 import { InstitucionesPage } from './pages/admin/InstitucionesPage';
 import { AuditoriaPage } from './pages/admin/AuditoriaPage';
 import { PerfilPage } from './pages/admin/PerfilPage';
+import { UsuariosPage } from './pages/admin/UsuariosPage';
 
 function App() {
   return (
@@ -21,7 +22,7 @@ function App() {
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/verificar" element={<VerifyCertificate />} />
+          <Route path="/verificar" element={<Navigate to="/" replace />} />
 
           {/* Protected admin routes */}
           <Route path="/admin" element={<AdminLayout />}>
@@ -31,12 +32,13 @@ function App() {
             <Route path="plantillas" element={<PlantillasPage />} />
             <Route path="instituciones" element={<InstitucionesPage />} />
             <Route path="auditoria" element={<AuditoriaPage />} />
+            <Route path="usuarios" element={<UsuariosPage />} />
             <Route path="perfil" element={<PerfilPage />} />
           </Route>
 
-          {/* Default redirect */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* Home → landing / public verify */}
+          <Route path="/" element={<VerifyCertificate />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
