@@ -169,3 +169,40 @@
   color: var(--color-error) !important;
   background: rgba(239, 68, 68, 0.08) !important;
 }
+
+/* Sidebar colapsado: centrar iconos */
+.sidebar.collapsed .sidebar-link {
+  justify-content: center;
+  padding: 0.7rem;
+  gap: 0;
+}
+
+.sidebar.collapsed .sidebar-nav {
+  padding: 1rem 0.5rem;
+}
+
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+}
+
+@media (max-width: 900px) {
+  .sidebar { width: 72px; }
+  .sidebar-brand span, .sidebar-user-info { display: none; }
+  .collapse-btn { display: none; }
+  .sidebar-link { justify-content: center; padding: 0.7rem; gap: 0; }
+  .sidebar-nav { padding: 1rem 0.5rem; }
+  .sidebar-header { justify-content: center; padding: 1rem 0.75rem; }
+}
+
+@media (max-width: 768px) {
+  .sidebar { width: 72px !important; }
+  .sidebar-brand, .sidebar-user-info { display: none; }
+  .collapse-btn { display: none; }
+}
+
+@media (max-width: 480px) {
+  .sidebar { width: 56px !important; }
+  .sidebar-link { padding: 0.6rem; }
+  .sidebar-header { padding: 0.85rem 0.5rem; min-height: 56px; }
+  .user-avatar { width: 32px; height: 32px; font-size: 0.8rem; }
+}

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FileBadge, Users, Building2, FileText,
-  ScrollText, ShieldCheck, LogOut, ChevronLeft, ChevronRight, User, UserCheck
+  ScrollText, ShieldCheck, LogOut, ChevronLeft, ChevronRight, User, UserCheck, ShieldAlert, Zap
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import './Sidebar.css';
@@ -12,23 +12,31 @@ const allNavItems = [
   { path: '/admin/certificados', icon: FileBadge, label: 'Certificados', permission: 'certificado:listar' },
   { path: '/admin/estudiantes', icon: Users, label: 'Estudiantes', permission: 'estudiante:listar' },
   { path: '/admin/usuarios', icon: UserCheck, label: 'Usuarios', permission: 'usuario:listar' },
+  { path: '/admin/roles', icon: ShieldAlert, label: 'Roles y Permisos', permission: 'usuario:listar' },
   { path: '/admin/plantillas', icon: FileText, label: 'Plantillas', permission: 'plantilla:listar' },
   { path: '/admin/instituciones', icon: Building2, label: 'Instituciones', permission: 'institucion:ver' },
+  { path: '/admin/integraciones', icon: Zap, label: 'Integraciones', permission: 'institucion:ver' },
   { path: '/admin/auditoria', icon: ScrollText, label: 'Auditoría', permission: 'auditoria:ver' },
 ];
 
 const ROLE_META = {
-  admin: { label: 'Administrador', color: '#00f0ff' },
-  editor: { label: 'Emisor', color: '#b026ff' },
-  lector: { label: 'Lector', color: '#38bdf8' },
+  admin:     { label: 'Administrador', color: '#00f0ff' },
+  editor:    { label: 'Emisor',        color: '#b026ff' },
+  lector:    { label: 'Lector',        color: '#38bdf8' },
+  viewer:    { label: 'Viewer',        color: '#34d399' },
+  emisor:    { label: 'Emisor',        color: '#f59e0b' },
+  docente:   { label: 'Docente',       color: '#fb923c' },
+  validador: { label: 'Validador',     color: '#a78bfa' },
 };
+
+const ROLE_FALLBACK = { label: 'Usuario', color: '#94a3b8' };
 
 export const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const { user, logout, hasPermission } = useAuth();
 
   const navItems = allNavItems.filter(item => !item.permission || hasPermission(item.permission));
-  const meta = ROLE_META[user?.rol] || ROLE_META.lector;
+  const meta = ROLE_META[user?.rol] || ROLE_FALLBACK;
   const initials = `${user?.nombre?.charAt(0) || ''}${user?.apellido?.charAt(0) || ''}`.toUpperCase();
 
   return (

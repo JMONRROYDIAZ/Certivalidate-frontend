@@ -1,57 +1,144 @@
-import React, { useState, useMemo } from 'react';
-import { MOCK_AUDITORIA } from '../../utils/mockData';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { auditoriaApi } from '../../api/auditoria.api';
 import { Pagination } from '../../components/ui/Pagination';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { formatDateTime } from '../../utils/helpers';
-import { Eye, RotateCcw } from 'lucide-react';
+import { getActionColor, formatAccion } from '../../constants/audit';
+import { Eye, RotateCcw, Download, FileJson, FileSpreadsheet, X } from 'lucide-react';
+import { exportToXLSX } from '../../utils/exportExcel';
+import './AuditoriaPage.css';
 
-const LIMIT = 20;
+const LIMIT = 50;
+
+const ACCIONES = [
+  'EMITIR_CERTIFICADO', 'REVOCAR_CERTIFICADO', 'VERIFICAR_CERTIFICADO',
+  'CREAR_USUARIO', 'ACTUALIZAR_USUARIO', 'ELIMINAR_USUARIO',
+  'ACTUALIZAR_PERFIL', 'CAMBIAR_PASSWORD',
+  'CREAR_ESTUDIANTE', 'ACTUALIZAR_ESTUDIANTE', 'ELIMINAR_ESTUDIANTE',
+  'CREAR_PLANTILLA', 'ACTUALIZAR_PLANTILLA', 'ARCHIVAR_PLANTILLA',
+  'CREAR_INSTITUCION', 'ACTUALIZAR_INSTITUCION', 'DESACTIVAR_INSTITUCION',
+  'LOGIN', 'LOGOUT',
+];
+
+const AUDIT_HEADERS = ['Fecha', 'Usuario', 'Email', 'Institución', 'Acción', 'Entidad', 'ID Entidad', 'IP'];
+
+function buildAuditRows(rows) {
+  return rows.map(a => ({
+    'Fecha':        formatDateTime(a.fecha),
+    'Usuario':      `${a.usuario?.nombre || ''} ${a.usuario?.apellido || ''}`.trim() || '—',
+    'Email':        a.usuario?.email || '—',
+    'Institución':  a.institucion?.nombre || '—',
+    'Acción':       formatAccion(a.accion),
+    'Entidad':      a.entidad || '—',
+    'ID Entidad':   a.entidad_id || '—',
+    'IP':           a.ip || '—',
+  }));
+}
+
+function exportXLSX(rows) {
+  exportToXLSX(buildAuditRows(rows), AUDIT_HEADERS, 'auditoria');
+}
+
+function exportJSON(rows) {
+  const data = rows.map(a => ({
+    fecha:        formatDateTime(a.fecha),
+    usuario:      `${a.usuario?.nombre || ''} ${a.usuario?.apellido || ''}`.trim() || null,
+    email:        a.usuario?.email || null,
+    institucion:  a.institucion?.nombre || null,
+    accion:       formatAccion(a.accion),
+    accion_codigo: a.accion || null,
+    entidad:      a.entidad || null,
+    entidad_id:   a.entidad_id || null,
+    ip:           a.ip || null,
+  }));
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const ts = new Date().toISOString().slice(0, 10);
+  a.download = `auditoria-${ts}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export const AuditoriaPage = () => {
-  const [page, setPage] = useState(1);
+  const [auditorias, setAuditorias]   = useState([]);
+  const [page, setPage]               = useState(1);
+  const [totalPages, setTotalPages]   = useState(1);
+  const [loading, setLoading]         = useState(true);
+  const [listError, setListError]     = useState('');
+
   const [filterEntidad, setFilterEntidad] = useState('');
-  const [filterAccion, setFilterAccion] = useState('');
+  const [filterAccion, setFilterAccion]   = useState('');
   const [filterUsuario, setFilterUsuario] = useState('');
-  const [fechaDesde, setFechaDesde] = useState('');
-  const [fechaHasta, setFechaHasta] = useState('');
-  const [detailEntry, setDetailEntry] = useState(null);
+  const [fechaDesde, setFechaDesde]       = useState('');
+  const [fechaHasta, setFechaHasta]       = useState('');
+  const [detailEntry, setDetailEntry]       = useState(null);
+  const [exporting, setExporting]           = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat]     = useState('csv');
 
   const usuarios = useMemo(() => {
     const seen = new Set();
-    return MOCK_AUDITORIA
+    return auditorias
       .map(a => a.usuario)
       .filter(u => u && !seen.has(u.id) && seen.add(u.id));
-  }, []);
+  }, [auditorias]);
 
-  const filtered = useMemo(() => {
-    return MOCK_AUDITORIA.filter(a => {
-      if (filterEntidad && a.entidad !== filterEntidad) return false;
-      if (filterAccion && a.accion !== filterAccion) return false;
-      if (filterUsuario && a.usuario_id !== filterUsuario) return false;
-      if (fechaDesde && new Date(a.fecha) < new Date(fechaDesde)) return false;
-      if (fechaHasta && new Date(a.fecha) > new Date(fechaHasta + 'T23:59:59')) return false;
-      return true;
-    });
-  }, [filterEntidad, filterAccion, filterUsuario, fechaDesde, fechaHasta]);
+  const buildParams = useCallback(() => ({
+    page, limit: LIMIT,
+    entidad: filterEntidad,
+    accion: filterAccion || undefined,
+    usuario_id: filterUsuario,
+    fecha_desde: fechaDesde,
+    fecha_hasta: fechaHasta ? fechaHasta + 'T23:59:59' : '',
+  }), [page, filterEntidad, filterAccion, filterUsuario, fechaDesde, fechaHasta]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / LIMIT));
-  const auditorias = filtered.slice((page - 1) * LIMIT, page * LIMIT);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setListError('');
+    try {
+      const data = await auditoriaApi.listar(buildParams());
+      setAuditorias(data.auditorias);
+      setTotalPages(data.totalPages);
+    } catch (err) {
+      setListError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [buildParams]);
 
-  const hasFilters = filterEntidad || filterAccion || filterUsuario || fechaDesde || fechaHasta;
+  useEffect(() => { load(); }, [load]);
 
   const clearFilters = () => {
     setFilterEntidad(''); setFilterAccion(''); setFilterUsuario('');
     setFechaDesde(''); setFechaHasta(''); setPage(1);
   };
 
-  const getActionColor = (accion) => {
-    if (accion.includes('CREAR') || accion.includes('EMITIR')) return 'success';
-    if (accion.includes('REVOCAR') || accion.includes('ELIMINAR')) return 'error';
-    if (accion.includes('ACTUALIZAR') || accion.includes('CAMBIAR')) return 'warning';
-    return 'primary';
+  const handleExport = async (fmt = exportFormat) => {
+    setExporting(true);
+    try {
+      const allPages = [];
+      let p = 1;
+      while (true) {
+        const data = await auditoriaApi.listar({ ...buildParams(), page: p, limit: 200 });
+        allPages.push(...(data.auditorias || []));
+        if (p >= (data.totalPages ?? 1)) break;
+        p++;
+      }
+      if (fmt === 'json') exportJSON(allPages);
+      else exportXLSX(allPages);
+      setShowExportModal(false);
+    } catch (err) {
+      alert('Error al exportar: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
   };
+
+  const hasFilters = filterEntidad || filterAccion || filterUsuario || fechaDesde || fechaHasta;
 
   return (
     <div className="animate-fade-in">
@@ -60,13 +147,21 @@ export const AuditoriaPage = () => {
           <h1>Auditoría</h1>
           <p>Registro completo de todas las acciones realizadas en la plataforma.</p>
         </div>
+        <button
+          className="btn-export-csv"
+          onClick={() => setShowExportModal(true)}
+          title="Exportar registros"
+        >
+          <Download size={15} />
+          Exportar
+        </button>
       </div>
 
-      <Card style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: hasFilters ? '0.75rem' : 0 }}>
+      <Card className={`audit-filters-card ${hasFilters ? 'has-filters' : ''}`}>
+        <div className="filter-grid">
           <div className="form-group">
-            <label className="form-label" style={{ fontSize: '0.75rem' }}>Entidad</label>
-            <select className="search-input" value={filterEntidad} onChange={e => { setFilterEntidad(e.target.value); setPage(1); }} style={{ minWidth: 0, width: '100%' }}>
+            <label className="form-label">Entidad</label>
+            <select className="search-input" value={filterEntidad} onChange={e => { setFilterEntidad(e.target.value); setPage(1); }}>
               <option value="">Todas</option>
               <option value="Certificado">Certificado</option>
               <option value="Usuario">Usuario</option>
@@ -76,61 +171,42 @@ export const AuditoriaPage = () => {
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label" style={{ fontSize: '0.75rem' }}>Acción</label>
-            <select className="search-input" value={filterAccion} onChange={e => { setFilterAccion(e.target.value); setPage(1); }} style={{ minWidth: 0, width: '100%' }}>
+            <label className="form-label">Acción</label>
+            <select className="search-input" value={filterAccion} onChange={e => { setFilterAccion(e.target.value); setPage(1); }}>
               <option value="">Todas</option>
-              <option value="EMITIR_CERTIFICADO">Emitir Certificado</option>
-              <option value="REVOCAR_CERTIFICADO">Revocar Certificado</option>
-              <option value="CREAR_USUARIO">Crear Usuario</option>
-              <option value="ACTUALIZAR_PERFIL">Actualizar Perfil</option>
-              <option value="CAMBIAR_PASSWORD">Cambiar Contraseña</option>
+              {ACCIONES.map(a => (
+                <option key={a} value={a}>{formatAccion(a)}</option>
+              ))}
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label" style={{ fontSize: '0.75rem' }}>Usuario</label>
-            <select className="search-input" value={filterUsuario} onChange={e => { setFilterUsuario(e.target.value); setPage(1); }} style={{ minWidth: 0, width: '100%' }}>
+            <label className="form-label">Usuario</label>
+            <select className="search-input" value={filterUsuario} onChange={e => { setFilterUsuario(e.target.value); setPage(1); }}>
               <option value="">Todos</option>
               {usuarios.map(u => <option key={u.id} value={u.id}>{u.nombre} {u.apellido}</option>)}
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label" style={{ fontSize: '0.75rem' }}>Desde</label>
-            <input
-              type="date"
-              className="search-input"
-              value={fechaDesde}
-              onChange={e => { setFechaDesde(e.target.value); setPage(1); }}
-              style={{ minWidth: 0, width: '100%', colorScheme: 'dark' }}
-            />
+            <label className="form-label">Desde</label>
+            <input type="date" className="search-input" value={fechaDesde} onChange={e => { setFechaDesde(e.target.value); setPage(1); }} />
           </div>
           <div className="form-group">
-            <label className="form-label" style={{ fontSize: '0.75rem' }}>Hasta</label>
-            <input
-              type="date"
-              className="search-input"
-              value={fechaHasta}
-              onChange={e => { setFechaHasta(e.target.value); setPage(1); }}
-              style={{ minWidth: 0, width: '100%', colorScheme: 'dark' }}
-            />
+            <label className="form-label">Hasta</label>
+            <input type="date" className="search-input" value={fechaHasta} onChange={e => { setFechaHasta(e.target.value); setPage(1); }} />
           </div>
         </div>
+
         {hasFilters && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-              {filtered.length} resultado(s) encontrado(s)
-            </span>
-            <button
-              onClick={clearFilters}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '0.82rem' }}
-            >
-              <RotateCcw size={13} /> Limpiar filtros
-            </button>
-          </div>
+          <button className="btn-clear-filters" onClick={clearFilters}>
+            <RotateCcw size={13} /> Limpiar filtros
+          </button>
         )}
       </Card>
 
+      {listError && <div className="alert alert-error">{listError}</div>}
+
       <Card>
-        <div style={{ overflowX: 'auto' }}>
+        <div className="table-overflow-wrap">
           <table className="data-table">
             <thead>
               <tr>
@@ -139,25 +215,35 @@ export const AuditoriaPage = () => {
                 <th>Acción</th>
                 <th>Entidad</th>
                 <th>IP</th>
+                <th>Resultado</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {auditorias.length === 0 ? (
-                <tr><td colSpan={6} className="empty-state">No hay registros con los filtros aplicados.</td></tr>
+              {loading ? (
+                <tr><td colSpan={7} className="empty-state">Cargando...</td></tr>
+              ) : auditorias.length === 0 ? (
+                <tr><td colSpan={7} className="empty-state">No hay registros con los filtros aplicados.</td></tr>
               ) : auditorias.map(a => (
                 <tr key={a.id?.toString()}>
-                  <td style={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatDateTime(a.fecha)}</td>
+                  <td className="audit-date-col">{formatDateTime(a.fecha)}</td>
                   <td>
-                    <div style={{ fontWeight: 500 }}>{a.usuario?.nombre} {a.usuario?.apellido}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{a.usuario?.email}</div>
+                    <div className="audit-user-name">{a.usuario?.nombre} {a.usuario?.apellido}</div>
+                    <div className="audit-user-email">{a.usuario?.email}</div>
                   </td>
-                  <td><Badge variant={getActionColor(a.accion)}>{a.accion.replace(/_/g, ' ')}</Badge></td>
+                  <td><Badge variant={getActionColor(a.accion)}>{formatAccion(a.accion)}</Badge></td>
                   <td>
-                    <span style={{ fontSize: '0.85rem' }}>{a.entidad}</span>
-                    {a.entidad_id && <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>{a.entidad_id}</div>}
+                    <span className="audit-entity-label">{a.entidad}</span>
+                    {a.entidad_id && <div className="audit-entity-id">{a.entidad_id}</div>}
                   </td>
-                  <td style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>{a.ip || '—'}</td>
+                  <td className="audit-ip-col">{a.ip || '—'}</td>
+                  <td className="audit-result-col">
+                    {a.resultado
+                      ? <span className={`audit-result-badge ${a.resultado === 'exito' || a.resultado === 'exitoso' ? 'success' : 'fail'}`}>
+                          {a.resultado}
+                        </span>
+                      : '—'}
+                  </td>
                   <td>
                     <button className="icon-btn" title="Ver detalle" onClick={() => setDetailEntry(a)}><Eye size={15} /></button>
                   </td>
@@ -169,32 +255,86 @@ export const AuditoriaPage = () => {
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </Card>
 
+      {/* Export modal */}
+      <Modal isOpen={showExportModal} onClose={() => setShowExportModal(false)} title="Exportar registros" size="sm">
+        <div className="export-modal-body">
+          <p className="export-modal-desc">Selecciona el formato de exportación. Se exportarán todos los registros con los filtros activos.</p>
+
+          <div className="export-format-row">
+            <button
+              type="button"
+              className={`export-format-btn ${exportFormat === 'csv' ? 'export-format-btn--active' : ''}`}
+              onClick={() => setExportFormat('csv')}
+            >
+              <FileSpreadsheet size={16} />
+              Excel (.xlsx)
+            </button>
+            <button
+              type="button"
+              className={`export-format-btn ${exportFormat === 'json' ? 'export-format-btn--active' : ''}`}
+              onClick={() => setExportFormat('json')}
+            >
+              <FileJson size={16} />
+              JSON
+            </button>
+          </div>
+
+          {hasFilters && (
+            <div className="export-filters-summary">
+              <span className="export-filters-label">Filtros activos:</span>
+              <div className="export-filter-tags">
+                {filterEntidad && <span className="export-filter-tag">Entidad: {filterEntidad}</span>}
+                {filterAccion && <span className="export-filter-tag">Acción: {formatAccion(filterAccion)}</span>}
+                {fechaDesde && <span className="export-filter-tag">Desde: {fechaDesde}</span>}
+                {fechaHasta && <span className="export-filter-tag">Hasta: {fechaHasta}</span>}
+              </div>
+            </div>
+          )}
+
+          <div className="form-actions">
+            <button type="button" className="btn btn-ghost" onClick={() => setShowExportModal(false)}>
+              <X size={15} /> Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => handleExport(exportFormat)}
+              disabled={exporting}
+            >
+              <Download size={15} />
+              {exporting ? 'Exportando…' : exportFormat === 'json' ? 'Descargar .JSON' : 'Descargar .XLSX'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal isOpen={!!detailEntry} onClose={() => setDetailEntry(null)} title="Detalle de registro" size="md">
         {detailEntry && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9rem' }}>
-            <div className="detail-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-              <div><strong>Fecha:</strong><br /><span style={{ color: 'var(--color-text-muted)' }}>{formatDateTime(detailEntry.fecha)}</span></div>
-              <div><strong>Acción:</strong><br /><Badge variant={detailEntry.accion.includes('CREAR') || detailEntry.accion.includes('EMITIR') ? 'success' : detailEntry.accion.includes('REVOCAR') || detailEntry.accion.includes('ELIMINAR') ? 'error' : 'warning'}>{detailEntry.accion.replace(/_/g, ' ')}</Badge></div>
-              <div><strong>Usuario:</strong><br />{detailEntry.usuario?.nombre} {detailEntry.usuario?.apellido}<br /><span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{detailEntry.usuario?.email}</span></div>
-              <div><strong>IP de origen:</strong><br /><span style={{ fontFamily: 'monospace' }}>{detailEntry.ip || '—'}</span></div>
+          <div className="audit-detail-content">
+            <div className="detail-grid">
+              <div><strong>Fecha:</strong><br /><span className="audit-detail-value">{formatDateTime(detailEntry.fecha)}</span></div>
+              <div><strong>Acción:</strong><br /><Badge variant={getActionColor(detailEntry.accion)}>{formatAccion(detailEntry.accion)}</Badge></div>
+              <div><strong>Usuario:</strong><br />{detailEntry.usuario?.nombre} {detailEntry.usuario?.apellido}<br /><span className="audit-detail-user-email">{detailEntry.usuario?.email}</span></div>
+              <div><strong>IP de origen:</strong><br /><span className="text-mono">{detailEntry.ip || '—'}</span></div>
               <div><strong>Entidad:</strong><br />{detailEntry.entidad}</div>
-              <div><strong>ID afectado:</strong><br /><span style={{ fontFamily: 'monospace', fontSize: '0.82rem', wordBreak: 'break-all' }}>{detailEntry.entidad_id || '—'}</span></div>
+              <div><strong>ID afectado:</strong><br /><span className="audit-detail-id">{detailEntry.entidad_id || '—'}</span></div>
+              {detailEntry.resultado && <div><strong>Resultado:</strong><br />{detailEntry.resultado}</div>}
             </div>
             {(detailEntry.valores_antes || detailEntry.valores_despues) && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="audit-diff-grid">
                 {detailEntry.valores_antes && (
                   <div>
-                    <strong style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>ANTES</strong>
-                    <pre style={{ fontSize: '0.75rem', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 'var(--radius-sm)', padding: '0.5rem', marginTop: '0.25rem', overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-                      {JSON.stringify(detailEntry.valores_antes, null, 2)}
+                    <strong className="audit-diff-label">ANTES</strong>
+                    <pre className="audit-diff-pre before">
+                      {JSON.stringify(typeof detailEntry.valores_antes === 'string' ? JSON.parse(detailEntry.valores_antes) : detailEntry.valores_antes, null, 2)}
                     </pre>
                   </div>
                 )}
                 {detailEntry.valores_despues && (
                   <div>
-                    <strong style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>DESPUÉS</strong>
-                    <pre style={{ fontSize: '0.75rem', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: 'var(--radius-sm)', padding: '0.5rem', marginTop: '0.25rem', overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-                      {JSON.stringify(detailEntry.valores_despues, null, 2)}
+                    <strong className="audit-diff-label">DESPUÉS</strong>
+                    <pre className="audit-diff-pre after">
+                      {JSON.stringify(typeof detailEntry.valores_despues === 'string' ? JSON.parse(detailEntry.valores_despues) : detailEntry.valores_despues, null, 2)}
                     </pre>
                   </div>
                 )}

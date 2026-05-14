@@ -1,119 +1,78 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { MOCK_ESTUDIANTES, MOCK_INSTITUCIONES } from '../../utils/mockData';
+import { estudiantesApi } from '../../api/estudiantes.api';
+import { institucionesApi } from '../../api/instituciones.api';
+import { useListPage } from '../../hooks/useListPage';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Pagination } from '../../components/ui/Pagination';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { EstudianteForm } from '../../forms/EstudianteForm';
 import { formatDate } from '../../utils/helpers';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
+import './EstudiantesPage.css';
 
-const LIMIT = 10;
-
-const instMap = Object.fromEntries(MOCK_INSTITUCIONES.map(i => [i.id, i]));
+const INITIAL_FORM = { institucion_id: '', nombre: '', apellido: '', documento: '', email: '' };
 
 export const EstudiantesPage = () => {
   const { hasPermission } = useAuth();
-  const [estudiantes, setEstudiantes] = useState([...MOCK_ESTUDIANTES]);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [filterInst, setFilterInst] = useState('');
+  const [instituciones, setInstituciones] = useState([]);
+  const [instMap, setInstMap] = useState({});
 
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ institucion_id: '', nombre: '', apellido: '', documento: '', email: '' });
-  const [formError, setFormError] = useState('');
+  const {
+    items: estudiantes, page, totalPages, loading, listError, setPage,
+    search, setSearch, setFilter,
+    showForm, editing, form, setForm, formError,
+    openCreate, openEdit, closeForm, handleSubmit, handleRemove,
+  } = useListPage(estudiantesApi, {
+    initialForm: INITIAL_FORM,
+    dataKey: 'estudiantes',
+    removeConfirmMsg: '¿Eliminar este estudiante? Esta acción es permanente si no tiene certificados asociados.',
+  });
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return estudiantes.filter(e => {
-      if (filterInst && e.institucion_id !== filterInst) return false;
-      if (q && !`${e.nombre} ${e.apellido} ${e.documento} ${e.email}`.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [estudiantes, search, filterInst]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / LIMIT));
-  const pageEstudiantes = filtered.slice((page - 1) * LIMIT, page * LIMIT);
-
-  const openCreate = () => {
-    setEditing(null);
-    setForm({ institucion_id: MOCK_INSTITUCIONES[0]?.id || '', nombre: '', apellido: '', documento: '', email: '' });
-    setFormError('');
-    setShowForm(true);
-  };
-
-  const openEdit = (est) => {
-    setEditing(est.id);
-    setForm({ institucion_id: est.institucion_id, nombre: est.nombre, apellido: est.apellido, documento: est.documento, email: est.email || '' });
-    setFormError('');
-    setShowForm(true);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setFormError('');
-    if (!form.nombre.trim() || !form.apellido.trim()) { setFormError('Nombre y apellido son obligatorios.'); return; }
-    if (!form.documento.trim()) { setFormError('El documento de identidad es obligatorio.'); return; }
-    await new Promise(r => setTimeout(r, 400));
-    if (editing) {
-      setEstudiantes(prev => prev.map(est => est.id === editing ? { ...est, ...form } : est));
-    } else {
-      const dup = estudiantes.find(e => e.documento === form.documento.trim());
-      if (dup) { setFormError('Ya existe un estudiante con ese número de documento.'); return; }
-      setEstudiantes(prev => [{
-        id: `est-${Date.now()}`,
-        ...form,
-        created_at: new Date().toISOString(),
-      }, ...prev]);
-    }
-    setShowForm(false);
-    setPage(1);
-  };
-
-  const handleDelete = (id) => {
-    if (!confirm('¿Eliminar este estudiante? Esta acción es permanente si no tiene certificados asociados.')) return;
-    setEstudiantes(prev => prev.filter(e => e.id !== id));
-  };
-
-  const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+  useEffect(() => {
+    institucionesApi.listar({ limit: 100 }).then(res => {
+      const data = res.data ?? [];
+      setInstituciones(data);
+      setInstMap(Object.fromEntries(data.map(i => [i.id, i])));
+    }).catch(() => {});
+  }, []);
 
   return (
     <div className="animate-fade-in">
       <div className="page-header">
         <div>
           <h1>Estudiantes</h1>
-          <p>Administra los estudiantes registrados. Total: {estudiantes.length}</p>
+          <p>Administra los estudiantes registrados.</p>
         </div>
       </div>
 
       <div className="page-toolbar">
-        <div className="page-actions">
+        <div className="page-actions est-filters">
           <input
             className="search-input"
             placeholder="Buscar por nombre, apellido o documento..."
             value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
-            style={{ minWidth: 260 }}
+            onChange={e => setSearch(e.target.value)}
           />
-          <select
-            className="search-input"
-            value={filterInst}
-            onChange={e => { setFilterInst(e.target.value); setPage(1); }}
-            style={{ minWidth: 200 }}
-          >
+          <select className="search-input" onChange={e => setFilter('institucion_id', e.target.value)}>
             <option value="">Todas las instituciones</option>
-            {MOCK_INSTITUCIONES.map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
+            {instituciones.map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
           </select>
         </div>
         {hasPermission('estudiante:crear') && (
-          <Button variant="primary" icon={<Plus size={18} />} onClick={openCreate}>Nuevo Estudiante</Button>
+          <Button variant="primary" icon={<Plus size={18} />}
+            onClick={() => openCreate({ ...INITIAL_FORM, institucion_id: instituciones[0]?.id || '' })}>
+            Nuevo Estudiante
+          </Button>
         )}
       </div>
 
+      {listError && <div className="alert alert-error">{listError}</div>}
+
       <Card>
-        <div style={{ overflowX: 'auto' }}>
+        <div className="table-overflow-wrap">
           <table className="data-table">
             <thead>
               <tr>
@@ -126,15 +85,17 @@ export const EstudiantesPage = () => {
               </tr>
             </thead>
             <tbody>
-              {pageEstudiantes.length === 0 ? (
+              {loading ? (
+                <tr><td colSpan={6} className="empty-state">Cargando...</td></tr>
+              ) : estudiantes.length === 0 ? (
                 <tr><td colSpan={6} className="empty-state">No se encontraron estudiantes.</td></tr>
-              ) : pageEstudiantes.map(e => {
+              ) : estudiantes.map(e => {
                 const inst = instMap[e.institucion_id];
                 return (
                   <tr key={e.id}>
-                    <td style={{ fontWeight: 500 }}>{e.nombre} {e.apellido}</td>
-                    <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{e.documento}</td>
-                    <td style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{e.email || '—'}</td>
+                    <td className="est-name-col">{e.nombre} {e.apellido}</td>
+                    <td className="est-doc-col">{e.documento}</td>
+                    <td className="est-email-col">{e.email || '—'}</td>
                     <td>
                       {inst && (
                         <Badge variant={inst.activa ? 'primary' : 'muted'}>
@@ -142,14 +103,22 @@ export const EstudiantesPage = () => {
                         </Badge>
                       )}
                     </td>
-                    <td style={{ whiteSpace: 'nowrap', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{formatDate(e.created_at)}</td>
+                    <td className="est-date-col">{formatDate(e.created_at)}</td>
                     <td>
                       <div className="table-actions">
                         {hasPermission('estudiante:actualizar') && (
-                          <button className="icon-btn" title="Editar" onClick={() => openEdit(e)}><Pencil size={16} /></button>
+                          <button className="icon-btn" title="Editar"
+                            onClick={() => openEdit(e, est => ({
+                              institucion_id: est.institucion_id,
+                              nombre: est.nombre,
+                              apellido: est.apellido,
+                              documento: est.documento,
+                              email: est.email || '',
+                            }))}><Pencil size={15} /></button>
                         )}
                         {hasPermission('estudiante:eliminar') && (
-                          <button className="icon-btn danger" title="Eliminar" onClick={() => handleDelete(e.id)}><Trash2 size={16} /></button>
+                          <button className="icon-btn danger" title="Eliminar"
+                            onClick={() => handleRemove(e.id)}><Trash2 size={15} /></button>
                         )}
                       </div>
                     </td>
@@ -162,39 +131,16 @@ export const EstudiantesPage = () => {
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </Card>
 
-      <Modal isOpen={showForm} onClose={() => setShowForm(false)} title={editing ? 'Editar Estudiante' : 'Nuevo Estudiante'} size="md">
-        {formError && <div className="alert alert-error">{formError}</div>}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div className="form-group">
-            <label className="form-label">Institución <span style={{ color: 'var(--color-error)' }}>*</span></label>
-            <select className="form-input form-select" value={form.institucion_id} onChange={update('institucion_id')} required>
-              {MOCK_INSTITUCIONES.map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
-            </select>
-          </div>
-          <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="form-group">
-              <label className="form-label">Nombre <span style={{ color: 'var(--color-error)' }}>*</span></label>
-              <input className="form-input" value={form.nombre} onChange={update('nombre')} placeholder="Ana" required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Apellido <span style={{ color: 'var(--color-error)' }}>*</span></label>
-              <input className="form-input" value={form.apellido} onChange={update('apellido')} placeholder="Martínez" required />
-            </div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Documento de identidad <span style={{ color: 'var(--color-error)' }}>*</span></label>
-            <input className="form-input" value={form.documento} onChange={update('documento')} placeholder="1023456789" required />
-            <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>Cédula, pasaporte u otro identificador único.</p>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Email <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>(opcional)</span></label>
-            <input className="form-input" type="email" value={form.email} onChange={update('email')} placeholder="estudiante@email.com" />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-            <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button type="submit" variant="primary">{editing ? 'Guardar Cambios' : 'Crear Estudiante'}</Button>
-          </div>
-        </form>
+      <Modal isOpen={showForm} onClose={closeForm} title={editing ? 'Editar Estudiante' : 'Nuevo Estudiante'} size="md">
+        <EstudianteForm
+          form={form}
+          setForm={setForm}
+          onSubmit={handleSubmit}
+          onCancel={closeForm}
+          editing={!!editing}
+          error={formError}
+          instituciones={instituciones}
+        />
       </Modal>
     </div>
   );

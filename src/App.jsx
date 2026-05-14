@@ -5,6 +5,7 @@ import { AdminLayout } from './components/layout/AdminLayout';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { VerifyCertificate } from './pages/VerifyCertificate';
+import { VerifyEmail } from './pages/VerifyEmail';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { CertificadosPage } from './pages/admin/CertificadosPage';
 import { EstudiantesPage } from './pages/admin/EstudiantesPage';
@@ -13,6 +14,8 @@ import { InstitucionesPage } from './pages/admin/InstitucionesPage';
 import { AuditoriaPage } from './pages/admin/AuditoriaPage';
 import { PerfilPage } from './pages/admin/PerfilPage';
 import { UsuariosPage } from './pages/admin/UsuariosPage';
+import { RolesPage } from './pages/admin/RolesPage';
+import { IntegracionesPage } from './pages/admin/IntegracionesPage';
 
 function App() {
   return (
@@ -22,7 +25,7 @@ function App() {
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/verificar" element={<Navigate to="/" replace />} />
+          <Route path="/verificar-email" element={<VerifyEmail />} />
 
           {/* Protected admin routes */}
           <Route path="/admin" element={<AdminLayout />}>
@@ -33,6 +36,8 @@ function App() {
             <Route path="instituciones" element={<InstitucionesPage />} />
             <Route path="auditoria" element={<AuditoriaPage />} />
             <Route path="usuarios" element={<UsuariosPage />} />
+            <Route path="roles" element={<RolesPage />} />
+            <Route path="integraciones" element={<IntegracionesPage />} />
             <Route path="perfil" element={<PerfilPage />} />
           </Route>
 

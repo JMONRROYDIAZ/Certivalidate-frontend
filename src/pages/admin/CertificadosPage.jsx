@@ -1,118 +1,192 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { MOCK_CERTIFICADOS, MOCK_INSTITUCIONES, MOCK_ESTUDIANTES, MOCK_PLANTILLAS } from '../../utils/mockData';
+import { certificadosApi } from '../../api/certificados.api';
+import { institucionesApi } from '../../api/instituciones.api';
+import { estudiantesApi } from '../../api/estudiantes.api';
+import { plantillasApi } from '../../api/plantillas.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Pagination } from '../../components/ui/Pagination';
 import { Card } from '../../components/ui/Card';
-import { formatDate, getStatusClass, getStatusLabel } from '../../utils/helpers';
-import { Plus, Download, Ban, Eye } from 'lucide-react';
+import { formatDate, formatDateTime, getStatusClass, getStatusLabel } from '../../utils/helpers';
+import { EmitirCertificadoForm } from '../../forms/EmitirCertificadoForm';
+import { RevocarCertificadoForm } from '../../forms/RevocarCertificadoForm';
+import { Plus, Download, Ban, Eye, QrCode, Copy, Check, ChevronDown, ChevronUp, ExternalLink, Link2, Lock, History, FileBadge, ShieldCheck, Printer } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
+import './CertificadosPage.css';
 
 const LIMIT = 10;
 
-const MOTIVOS_REVOCACION = [
-  { value: 'ERROR_DATOS', label: 'Error en datos del certificado' },
-  { value: 'ERROR_EMISION', label: 'Error en la emisión' },
-  { value: 'FRAUDE', label: 'Fraude o falsificación' },
-  { value: 'DECISION_INSTITUCIONAL', label: 'Decisión institucional' },
-  { value: 'DUPLICADO', label: 'Certificado duplicado' },
-  { value: 'CADUCIDAD', label: 'Caducidad anticipada' },
-  { value: 'OTRO', label: 'Otro motivo' },
-];
-
-const generateCode = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  return Array.from({ length: 16 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-};
-
-const instMap = Object.fromEntries(MOCK_INSTITUCIONES.map(i => [i.id, i.nombre]));
+function CopyBtn({ text, title = 'Copiar' }) {
+  const [copied, setCopied] = useState(false);
+  const handle = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  };
+  return (
+    <button className={`copy-btn ${copied ? 'copied' : ''}`} onClick={handle} title={title} type="button">
+      {copied ? <Check size={13} /> : <Copy size={13} />}
+      {copied ? 'Copiado' : 'Copiar'}
+    </button>
+  );
+}
 
 export const CertificadosPage = () => {
   const { hasPermission } = useAuth();
-  const [certs, setCerts] = useState([...MOCK_CERTIFICADOS]);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('');
+
+  const [certs, setCerts]           = useState([]);
+  const [page, setPage]             = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading]       = useState(true);
+  const [listError, setListError]   = useState('');
+
+  const [search, setSearch]         = useState('');
+  const [debSearch, setDebSearch]   = useState('');
+  const [filter, setFilter]         = useState('');
   const [filterInst, setFilterInst] = useState('');
 
-  // Emit modal
-  const [showEmit, setShowEmit] = useState(false);
-  const [emitForm, setEmitForm] = useState({
-    estudiante_id: '',
-    plantilla_id: '',
-    institucion_id: MOCK_INSTITUCIONES.filter(i => i.activa)[0]?.id || '',
-    fecha_expiracion: '',
-  });
-  const [emitLoading, setEmitLoading] = useState(false);
+  const [instituciones, setInstituciones] = useState([]);
+  const [estudiantes, setEstudiantes]     = useState([]);
+  const [plantillas, setPlantillas]       = useState([]);
 
-  // Revoke modal
-  const [showRevoke, setShowRevoke] = useState(false);
-  const [revokeId, setRevokeId] = useState('');
-  const [revokeForm, setRevokeForm] = useState({ motivo_codigo: 'ERROR_DATOS', motivo_detalle: '' });
+  const [showEmit, setShowEmit]         = useState(false);
+  const [emitForm, setEmitForm]         = useState({ estudiante_id: '', plantilla_id: '', institucion_id: '' });
+  const [emitLoading, setEmitLoading]   = useState(false);
+  const [emitError, setEmitError]       = useState('');
 
-  // Detail modal
-  const [showDetail, setShowDetail] = useState(false);
-  const [detailCert, setDetailCert] = useState(null);
+  const [showRevoke, setShowRevoke]     = useState(false);
+  const [revokeId, setRevokeId]         = useState('');
+  const [revokeForm, setRevokeForm]     = useState({ motivo_codigo: 'ERROR_DATOS', motivo_detalle: '' });
+  const [revokeError, setRevokeError]   = useState('');
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return certs.filter(c => {
-      if (filter && c.estado !== filter) return false;
-      if (filterInst && c.institucion_id !== filterInst) return false;
-      if (q) {
-        const hay = `${c.codigo_unico} ${c.estudiante?.nombre} ${c.estudiante?.apellido}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [certs, search, filter, filterInst]);
+  const [showDetail, setShowDetail]     = useState(false);
+  const [detailCert, setDetailCert]     = useState(null);
+  const [showTechInfo, setShowTechInfo] = useState(false);
+  const [revocaciones, setRevocaciones] = useState([]);
+  const [loadingRevoc, setLoadingRevoc] = useState(false);
+  const [verificaciones, setVerificaciones] = useState([]);
+  const [loadingVerif, setLoadingVerif]     = useState(false);
+  const [verifFetched, setVerifFetched]     = useState(false);
+  const [showTimeline, setShowTimeline]     = useState(false);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / LIMIT));
-  const pageCerts = filtered.slice((page - 1) * LIMIT, page * LIMIT);
+  useEffect(() => {
+    const t = setTimeout(() => { setDebSearch(search); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const instEstudiantes = MOCK_ESTUDIANTES.filter(e => e.institucion_id === emitForm.institucion_id);
-  const instPlantillas = MOCK_PLANTILLAS.filter(p => p.institucion_id === emitForm.institucion_id && p.activa);
+  const loadCerts = useCallback(async () => {
+    setLoading(true);
+    setListError('');
+    try {
+      const data = await certificadosApi.listar({ page, limit: LIMIT, search: debSearch, estado: filter, institucion_id: filterInst });
+      setCerts(data.certificados);
+      setTotalPages(data.totalPages);
+    } catch (err) {
+      setListError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, debSearch, filter, filterInst]);
+
+  useEffect(() => { loadCerts(); }, [loadCerts]);
+
+  useEffect(() => {
+    Promise.all([
+      institucionesApi.listar({ limit: 100 }),
+      estudiantesApi.listar({ limit: 100 }),
+      plantillasApi.listar({ limit: 100 }),
+    ]).then(([insts, ests, plts]) => {
+      setInstituciones(insts.data ?? []);
+      setEstudiantes(ests.estudiantes ?? []);
+      setPlantillas(plts.data ?? []);
+    }).catch(() => {});
+  }, []);
 
   const openEmit = () => {
-    const firstInst = MOCK_INSTITUCIONES.filter(i => i.activa)[0]?.id || '';
-    setEmitForm({ estudiante_id: '', plantilla_id: '', institucion_id: firstInst, fecha_expiracion: '' });
+    const firstInst = instituciones.filter(i => i.activa)[0]?.id || '';
+    setEmitForm({ estudiante_id: '', plantilla_id: '', institucion_id: firstInst });
+    setEmitError('');
     setShowEmit(true);
   };
 
   const handleEmit = async (e) => {
     e.preventDefault();
     setEmitLoading(true);
-    await new Promise(r => setTimeout(r, 500));
-    const inst = MOCK_INSTITUCIONES.find(i => i.id === emitForm.institucion_id);
-    const est = MOCK_ESTUDIANTES.find(s => s.id === emitForm.estudiante_id);
-    const plt = MOCK_PLANTILLAS.find(p => p.id === emitForm.plantilla_id);
-    const newCert = {
-      id: `cert-${Date.now()}`,
-      estudiante_id: emitForm.estudiante_id,
-      plantilla_id: emitForm.plantilla_id,
-      institucion_id: emitForm.institucion_id,
-      codigo_unico: generateCode(),
-      estado: 'valido',
-      fecha_emision: new Date().toISOString(),
-      fecha_expiracion: emitForm.fecha_expiracion ? new Date(emitForm.fecha_expiracion).toISOString() : null,
-      hash_sha256: 'mock-hash-' + Math.random().toString(36).slice(2),
-      created_at: new Date().toISOString(),
-      estudiante: est ? { nombre: est.nombre, apellido: est.apellido, documento: est.documento } : null,
-      institucion: inst ? { nombre: inst.nombre } : null,
-      plantilla: plt ? { nombre: plt.nombre } : null,
-    };
-    setCerts(prev => [newCert, ...prev]);
-    setEmitLoading(false);
-    setShowEmit(false);
-    setPage(1);
+    setEmitError('');
+    try {
+      await certificadosApi.emitir({
+        estudiante_id: emitForm.estudiante_id,
+        institucion_id: emitForm.institucion_id,
+        plantilla_id: emitForm.plantilla_id,
+      });
+      setShowEmit(false);
+      setPage(1);
+      loadCerts();
+    } catch (err) {
+      setEmitError(err.message);
+    } finally {
+      setEmitLoading(false);
+    }
   };
 
   const handleRevoke = async (e) => {
     e.preventDefault();
-    await new Promise(r => setTimeout(r, 400));
-    setCerts(prev => prev.map(c => c.id === revokeId ? { ...c, estado: 'revocado' } : c));
-    setShowRevoke(false);
+    setRevokeError('');
+    try {
+      await certificadosApi.revocar(revokeId, revokeForm);
+      setShowRevoke(false);
+      setCerts(prev => prev.map(c => c.id === revokeId ? { ...c, estado: 'revocado' } : c));
+    } catch (err) {
+      setRevokeError(err.message);
+    }
+  };
+
+  const handleDescargar = async (c) => {
+    try {
+      const blob = await certificadosApi.descargar(c.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificado-${c.codigo_unico}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(`Error al descargar: ${err.message}`);
+    }
+  };
+
+  const handleToggleTimeline = async () => {
+    if (!showTimeline && !verifFetched && !loadingVerif) {
+      setLoadingVerif(true);
+      try {
+        const data = await certificadosApi.getVerificaciones(detailCert.id, { limit: 50 });
+        setVerificaciones(Array.isArray(data) ? data : (data.verificaciones ?? data.data ?? []));
+      } catch (_) {}
+      finally { setLoadingVerif(false); setVerifFetched(true); }
+    }
+    setShowTimeline(v => !v);
+  };
+
+  const openDetail = async (c) => {
+    setDetailCert(c);
+    setShowTechInfo(false);
+    setRevocaciones([]);
+    setVerificaciones([]);
+    setVerifFetched(false);
+    setShowTimeline(false);
+    setShowDetail(true);
+    if (c.estado === 'revocado') {
+      setLoadingRevoc(true);
+      try {
+        const data = await certificadosApi.getRevocaciones(c.id);
+        const raw = data.revocaciones ?? data.data ?? data ?? [];
+        setRevocaciones(Array.isArray(raw) ? raw : []);
+      } catch (_) {}
+      finally { setLoadingRevoc(false); }
+    }
   };
 
   return (
@@ -120,27 +194,26 @@ export const CertificadosPage = () => {
       <div className="page-header">
         <div>
           <h1>Certificados</h1>
-          <p>Gestiona todos los certificados digitales emitidos. Total: {certs.length}</p>
+          <p>Gestiona todos los certificados digitales emitidos.</p>
         </div>
       </div>
 
       <div className="page-toolbar">
-        <div className="page-actions">
+        <div className="page-actions cert-filters">
           <input
             className="search-input"
             placeholder="Buscar por código o nombre..."
             value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
-            style={{ minWidth: 220 }}
+            onChange={e => setSearch(e.target.value)}
           />
-          <select className="search-input" value={filter} onChange={e => { setFilter(e.target.value); setPage(1); }} style={{ minWidth: 130 }}>
+          <select className="search-input" value={filter} onChange={e => { setFilter(e.target.value); setPage(1); }}>
             <option value="">Todos los estados</option>
             <option value="valido">Válidos</option>
             <option value="revocado">Revocados</option>
           </select>
-          <select className="search-input" value={filterInst} onChange={e => { setFilterInst(e.target.value); setPage(1); }} style={{ minWidth: 200 }}>
+          <select className="search-input" value={filterInst} onChange={e => { setFilterInst(e.target.value); setPage(1); }}>
             <option value="">Todas las instituciones</option>
-            {MOCK_INSTITUCIONES.map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
+            {instituciones.map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
           </select>
         </div>
         {hasPermission('certificado:emitir') && (
@@ -148,8 +221,10 @@ export const CertificadosPage = () => {
         )}
       </div>
 
+      {listError && <div className="alert alert-error">{listError}</div>}
+
       <Card>
-        <div style={{ overflowX: 'auto' }}>
+        <div className="table-overflow-wrap">
           <table className="data-table">
             <thead>
               <tr>
@@ -164,27 +239,29 @@ export const CertificadosPage = () => {
               </tr>
             </thead>
             <tbody>
-              {pageCerts.length === 0 ? (
+              {loading ? (
+                <tr><td colSpan={8} className="empty-state">Cargando...</td></tr>
+              ) : certs.length === 0 ? (
                 <tr><td colSpan={8} className="empty-state">No se encontraron certificados.</td></tr>
-              ) : pageCerts.map(c => (
-                <tr key={c.id}>
-                  <td style={{ fontFamily: 'monospace', fontSize: '0.82rem', letterSpacing: '0.05em' }}>{c.codigo_unico}</td>
+              ) : certs.map(c => (
+                <tr key={c.id} className={c.estado === 'revocado' ? 'row-revoked' : ''}>
+                  <td className="cert-code-col">{c.codigo_unico}</td>
                   <td>{c.estudiante?.nombre} {c.estudiante?.apellido}</td>
-                  <td style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{c.institucion?.nombre}</td>
-                  <td style={{ fontSize: '0.85rem' }}>{c.plantilla?.nombre}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}>{formatDate(c.fecha_emision)}</td>
-                  <td style={{ whiteSpace: 'nowrap', color: 'var(--color-text-muted)' }}>{c.fecha_expiracion ? formatDate(c.fecha_expiracion) : '—'}</td>
+                  <td className="text-muted-sm">{c.institucion?.nombre}</td>
+                  <td className="cert-plantilla-col">{c.plantilla?.nombre}</td>
+                  <td className="text-nowrap">{formatDate(c.fecha_emision)}</td>
+                  <td className="text-nowrap text-muted">{c.fecha_expiracion ? formatDate(c.fecha_expiracion) : '—'}</td>
                   <td><Badge variant={getStatusClass(c.estado).replace('badge-', '')}>{getStatusLabel(c.estado)}</Badge></td>
                   <td>
                     <div className="table-actions">
                       {hasPermission('certificado:ver') && (
-                        <button className="icon-btn" title="Ver detalle" onClick={() => { setDetailCert(c); setShowDetail(true); }}><Eye size={16} /></button>
+                        <button className="icon-btn" title="Ver detalle" onClick={() => openDetail(c)}><Eye size={16} /></button>
                       )}
                       {hasPermission('certificado:descargar') && (
-                        <button className="icon-btn" title="Descargar PDF" onClick={() => alert(`Descarga simulada:\ncertificado-${c.codigo_unico}.pdf`)}><Download size={16} /></button>
+                        <button className="icon-btn" title="Descargar PDF" onClick={() => handleDescargar(c)}><Download size={16} /></button>
                       )}
                       {hasPermission('certificado:revocar') && c.estado !== 'revocado' && (
-                        <button className="icon-btn danger" title="Revocar" onClick={() => { setRevokeId(c.id); setRevokeForm({ motivo_codigo: 'ERROR_DATOS', motivo_detalle: '' }); setShowRevoke(true); }}>
+                        <button className="icon-btn danger" title="Revocar" onClick={() => { setRevokeId(c.id); setRevokeForm({ motivo_codigo: 'ERROR_DATOS', motivo_detalle: '' }); setRevokeError(''); setShowRevoke(true); }}>
                           <Ban size={16} />
                         </button>
                       )}
@@ -200,140 +277,297 @@ export const CertificadosPage = () => {
 
       {/* Emit Modal */}
       <Modal isOpen={showEmit} onClose={() => setShowEmit(false)} title="Emitir Nuevo Certificado" size="md">
-        <form onSubmit={handleEmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div className="form-group">
-            <label className="form-label">Institución <span style={{ color: 'var(--color-error)' }}>*</span></label>
-            <select
-              className="form-input form-select"
-              value={emitForm.institucion_id}
-              onChange={e => setEmitForm({ ...emitForm, institucion_id: e.target.value, estudiante_id: '', plantilla_id: '' })}
-              required
-            >
-              <option value="">Seleccionar institución...</option>
-              {MOCK_INSTITUCIONES.filter(i => i.activa).map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Estudiante <span style={{ color: 'var(--color-error)' }}>*</span></label>
-            <select
-              className="form-input form-select"
-              value={emitForm.estudiante_id}
-              onChange={e => setEmitForm({ ...emitForm, estudiante_id: e.target.value })}
-              required
-              disabled={!emitForm.institucion_id}
-            >
-              <option value="">Seleccionar estudiante...</option>
-              {instEstudiantes.map(e => (
-                <option key={e.id} value={e.id}>{e.nombre} {e.apellido} — Doc. {e.documento}</option>
-              ))}
-            </select>
-            {emitForm.institucion_id && instEstudiantes.length === 0 && (
-              <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                No hay estudiantes registrados en esta institución.
-              </p>
-            )}
-          </div>
-          <div className="form-group">
-            <label className="form-label">Plantilla <span style={{ color: 'var(--color-error)' }}>*</span></label>
-            <select
-              className="form-input form-select"
-              value={emitForm.plantilla_id}
-              onChange={e => setEmitForm({ ...emitForm, plantilla_id: e.target.value })}
-              required
-              disabled={!emitForm.institucion_id}
-            >
-              <option value="">Seleccionar plantilla...</option>
-              {instPlantillas.map(p => (
-                <option key={p.id} value={p.id}>{p.nombre} (v{p.version})</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Fecha de expiración <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>(opcional)</span></label>
-            <input
-              type="date"
-              className="form-input"
-              value={emitForm.fecha_expiracion}
-              onChange={e => setEmitForm({ ...emitForm, fecha_expiracion: e.target.value })}
-              min={new Date().toISOString().split('T')[0]}
-              style={{ colorScheme: 'dark' }}
-            />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-            <Button type="button" variant="ghost" onClick={() => setShowEmit(false)}>Cancelar</Button>
-            <Button type="submit" variant="primary" disabled={emitLoading}>
-              {emitLoading ? 'Emitiendo...' : 'Emitir Certificado'}
-            </Button>
-          </div>
-        </form>
+        {emitError && <div className="alert alert-error">{emitError}</div>}
+        <EmitirCertificadoForm
+          form={emitForm}
+          setForm={setEmitForm}
+          onSubmit={handleEmit}
+          onCancel={() => setShowEmit(false)}
+          loading={emitLoading}
+          instituciones={instituciones}
+          estudiantes={estudiantes}
+          plantillas={plantillas}
+        />
       </Modal>
 
       {/* Revoke Modal */}
       <Modal isOpen={showRevoke} onClose={() => setShowRevoke(false)} title="Revocar Certificado" size="sm">
-        <div className="alert alert-error" style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
-          Esta acción es irreversible. El certificado quedará marcado como revocado y no podrá ser rehabilitado.
-        </div>
-        <form onSubmit={handleRevoke} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div className="form-group">
-            <label className="form-label">Motivo de revocación <span style={{ color: 'var(--color-error)' }}>*</span></label>
-            <select
-              className="form-input form-select"
-              value={revokeForm.motivo_codigo}
-              onChange={e => setRevokeForm({ ...revokeForm, motivo_codigo: e.target.value })}
-            >
-              {MOTIVOS_REVOCACION.map(m => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Detalle adicional <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>(opcional, máx. 500 caracteres)</span></label>
-            <textarea
-              className="form-input form-textarea"
-              value={revokeForm.motivo_detalle}
-              onChange={e => setRevokeForm({ ...revokeForm, motivo_detalle: e.target.value })}
-              maxLength={500}
-              placeholder="Describe el motivo con más detalle..."
-              rows={3}
-            />
-            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textAlign: 'right' }}>
-              {revokeForm.motivo_detalle.length}/500
-            </p>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-            <Button type="button" variant="ghost" onClick={() => setShowRevoke(false)}>Cancelar</Button>
-            <Button type="submit" variant="primary">Confirmar Revocación</Button>
-          </div>
-        </form>
+        {revokeError && <div className="alert alert-error">{revokeError}</div>}
+        <RevocarCertificadoForm
+          form={revokeForm}
+          setForm={setRevokeForm}
+          onSubmit={handleRevoke}
+          onCancel={() => setShowRevoke(false)}
+        />
       </Modal>
 
       {/* Detail Modal */}
       <Modal isOpen={showDetail} onClose={() => setShowDetail(false)} title="Detalle de Certificado" size="lg">
-        {detailCert && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div className="detail-grid">
-              <div><strong>Código único:</strong><br /><span style={{ fontFamily: 'monospace', fontSize: '1rem', color: 'var(--color-primary)' }}>{detailCert.codigo_unico}</span></div>
-              <div><strong>Estado:</strong><br /><Badge variant={getStatusClass(detailCert.estado).replace('badge-', '')}>{getStatusLabel(detailCert.estado)}</Badge></div>
-              <div><strong>Estudiante:</strong><br />{detailCert.estudiante?.nombre} {detailCert.estudiante?.apellido}</div>
-              <div><strong>Documento:</strong><br />{detailCert.estudiante?.documento}</div>
-              <div><strong>Institución:</strong><br />{detailCert.institucion?.nombre}</div>
-              <div><strong>Plantilla:</strong><br />{detailCert.plantilla?.nombre}</div>
-              <div><strong>Fecha de emisión:</strong><br />{formatDate(detailCert.fecha_emision)}</div>
-              <div><strong>Fecha de expiración:</strong><br />{formatDate(detailCert.fecha_expiracion)}</div>
-            </div>
-            <div>
-              <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>HASH SHA-256 (integridad)</strong>
-              <p style={{ fontFamily: 'monospace', fontSize: '0.78rem', wordBreak: 'break-all', marginTop: '0.25rem', padding: '0.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-sm)' }}>
-                {detailCert.hash_sha256}
-              </p>
-            </div>
-            {detailCert.estado === 'revocado' && (
-              <div className="alert alert-error" style={{ margin: 0 }}>
-                Este certificado fue revocado y ya no es válido.
+        {detailCert && (() => {
+          const qrUrl = `${window.location.origin}/?codigo=${detailCert.codigo_unico}`;
+          const downloadQr = () => {
+            const canvas = document.getElementById('cert-qr-canvas');
+            if (!canvas) return;
+            const link = document.createElement('a');
+            link.download = `qr-${detailCert.codigo_unico}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+          };
+          return (
+            <div className="detail-col">
+
+              {/* Banner + detalle de revocación */}
+              {detailCert.estado === 'revocado' && (
+                <>
+                  <div className="revoked-banner">
+                    <Ban size={16} />
+                    <span><strong>Certificado Revocado</strong> — Este certificado fue revocado y ya no es válido.</span>
+                  </div>
+                  {loadingRevoc ? (
+                    <p className="revoc-loading">Cargando detalle de revocación…</p>
+                  ) : revocaciones.length > 0 && (
+                    <div className="revoc-detail-section">
+                      {revocaciones.map((r, i) => {
+                        const u = r.usuario;
+                        const initials = u
+                          ? `${u.nombre?.charAt(0) || ''}${u.apellido?.charAt(0) || ''}`.toUpperCase() || '?'
+                          : null;
+                        return (
+                          <div key={r.id ?? i} className="revoc-detail-card">
+                            <div className="revoc-card-header">
+                              <div className="revoc-header-fields">
+                                <div className="revoc-detail-row">
+                                  <span className="revoc-label">Motivo</span>
+                                  <span className="revoc-value revoc-motivo">{r.motivo_codigo?.replace(/_/g, ' ')}</span>
+                                </div>
+                                {r.motivo_detalle && (
+                                  <div className="revoc-detail-row">
+                                    <span className="revoc-label">Detalle</span>
+                                    <span className="revoc-value">{r.motivo_detalle}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <button className="revoc-print-btn" title="Exportar / Imprimir" onClick={() => window.print()} type="button">
+                                <Printer size={13} /> Imprimir
+                              </button>
+                            </div>
+
+                            <div className="revoc-detail-row revoc-user-row">
+                              <span className="revoc-label">Revocado por</span>
+                              {u ? (
+                                <div className="revoc-user-info">
+                                  <div className="revoc-user-avatar">{initials}</div>
+                                  <div>
+                                    <span className="revoc-value">{u.nombre} {u.apellido || ''}</span>
+                                    <span className="revoc-user-email">{u.email}</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="revoc-value">—</span>
+                              )}
+                            </div>
+
+                            <div className="revoc-detail-row">
+                              <span className="revoc-label">Fecha revocación</span>
+                              <span className="revoc-value">{formatDate(r.fecha_revocacion)}</span>
+                            </div>
+
+                            {r.tx_hash_revocacion && (
+                              <div className="revoc-detail-row">
+                                <span className="revoc-label">TX Revocación</span>
+                                <div className="cert-code-row">
+                                  <span className="hash-display">{r.tx_hash_revocacion.slice(0, 16)}…{r.tx_hash_revocacion.slice(-8)}</span>
+                                  <CopyBtn text={r.tx_hash_revocacion} title="Copiar TX hash" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="detail-grid">
+                <div>
+                  <strong>Código único:</strong>
+                  <div className="cert-code-row">
+                    <span className="cert-detail-code">{detailCert.codigo_unico}</span>
+                    <CopyBtn text={detailCert.codigo_unico} title="Copiar código único" />
+                  </div>
+                </div>
+                <div>
+                  <strong>Estado:</strong><br />
+                  <Badge variant={getStatusClass(detailCert.estado).replace('badge-', '')}>{getStatusLabel(detailCert.estado)}</Badge>
+                </div>
+                <div><strong>Estudiante:</strong><br />{detailCert.estudiante?.nombre} {detailCert.estudiante?.apellido}</div>
+                <div><strong>Documento:</strong><br />{detailCert.estudiante?.documento}</div>
+                <div><strong>Institución:</strong><br />{detailCert.institucion?.nombre}</div>
+                <div><strong>Plantilla:</strong><br />{detailCert.plantilla?.nombre}</div>
+                <div><strong>Fecha de emisión:</strong><br />{formatDate(detailCert.fecha_emision)}</div>
+                <div><strong>Fecha de expiración:</strong><br />{detailCert.fecha_expiracion ? formatDate(detailCert.fecha_expiracion) : '—'}</div>
               </div>
-            )}
-          </div>
-        )}
+
+              {/* Enlace al portal de verificación */}
+              <a
+                href={`/?codigo=${detailCert.codigo_unico}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="verify-link-btn"
+              >
+                <ExternalLink size={14} />
+                Ver en portal de verificación pública
+              </a>
+
+              <div className="cert-qr-section">
+                <strong className="cert-hash-label"><QrCode size={14} style={{ display: 'inline', marginRight: 6 }} />Código QR de verificación</strong>
+                <div className="cert-qr-wrap">
+                  <QRCodeCanvas
+                    id="cert-qr-canvas"
+                    value={qrUrl}
+                    size={140}
+                    bgColor="#ffffff"
+                    fgColor="#111827"
+                    level="M"
+                  />
+                </div>
+                <p className="cert-qr-hint">Escanea para verificar autenticidad</p>
+                <button className="btn-secondary cert-qr-download" onClick={downloadQr}>
+                  <Download size={14} /> Descargar QR
+                </button>
+              </div>
+
+              {/* Sección blockchain */}
+              <div className="cert-blockchain-section">
+                {detailCert.tx_hash ? (
+                  <>
+                    <div className="cert-blockchain-verified">
+                      <Link2 size={13} /> Verificado en Blockchain
+                    </div>
+                    <div className="cert-blockchain-details">
+                      <div className="tech-info-row">
+                        <span className="tech-info-label">TX Hash</span>
+                        <div className="cert-code-row">
+                          <span className="hash-display">{detailCert.tx_hash.slice(0, 24)}…{detailCert.tx_hash.slice(-12)}</span>
+                          <CopyBtn text={detailCert.tx_hash} title="Copiar TX Hash" />
+                        </div>
+                      </div>
+                      {detailCert.fecha_blockchain && (
+                        <div className="tech-info-row">
+                          <span className="tech-info-label">Registrado on-chain</span>
+                          <span className="text-mono">{formatDate(detailCert.fecha_blockchain)}</span>
+                        </div>
+                      )}
+                      {detailCert.red_blockchain && (
+                        <div className="tech-info-row">
+                          <span className="tech-info-label">Red</span>
+                          <span className="text-mono">{detailCert.red_blockchain}</span>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="cert-blockchain-pending">
+                    <Lock size={13} /> Registro en blockchain pendiente
+                  </div>
+                )}
+              </div>
+
+              {/* Timeline de eventos */}
+              <button className="tech-toggle-btn" onClick={handleToggleTimeline} type="button">
+                {showTimeline ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                <History size={15} />
+                Historial de eventos
+              </button>
+
+              {showTimeline && (
+                <div className="cert-timeline-section animate-fade-in">
+                  {loadingVerif ? (
+                    <p className="revoc-loading">Cargando historial…</p>
+                  ) : (() => {
+                    try {
+                    const items = [
+                      {
+                        type: 'emision',
+                        date: new Date(detailCert.fecha_emision),
+                        label: 'Certificado emitido',
+                        sub: detailCert.institucion?.nombre || '',
+                      },
+                      ...verificaciones.map(v => ({
+                        type: 'verificacion',
+                        date: new Date(v.fecha_verificacion || v.fecha || v.created_at),
+                        label: 'Verificación pública',
+                        sub: v.ip ? `IP: ${v.ip}` : '',
+                      })),
+                      ...revocaciones.map(r => ({
+                        type: 'revocacion',
+                        date: new Date(r.fecha_revocacion),
+                        label: 'Certificado revocado',
+                        sub: r.motivo_codigo?.replace(/_/g, ' ') || '',
+                      })),
+                    ]
+                      .filter(item => !isNaN(item.date.getTime()))
+                      .sort((a, b) => b.date - a.date);
+
+                    if (items.length === 0) return <p className="revoc-loading">Sin eventos registrados.</p>;
+
+                    return items.map((item, idx) => (
+                      <div key={idx} className="timeline-item">
+                        <div className="timeline-line-wrap">
+                          <div className={`timeline-dot timeline-dot--${item.type}`}>
+                            {item.type === 'emision' && <FileBadge size={12} />}
+                            {item.type === 'verificacion' && <ShieldCheck size={12} />}
+                            {item.type === 'revocacion' && <Ban size={12} />}
+                          </div>
+                          {idx < items.length - 1 && <div className="timeline-connector" />}
+                        </div>
+                        <div className="timeline-content">
+                          <p className="timeline-date">{formatDateTime(item.date)}</p>
+                          <p className="timeline-label">{item.label}</p>
+                          {item.sub && <p className="timeline-sub">{item.sub}</p>}
+                        </div>
+                      </div>
+                    ));
+                    } catch (_) {
+                      return <p className="revoc-loading">Error al cargar el historial.</p>;
+                    }
+                  })()}
+                </div>
+              )}
+
+              {/* Sección técnica colapsable */}
+              <button
+                className="tech-toggle-btn"
+                onClick={() => setShowTechInfo(v => !v)}
+                type="button"
+              >
+                {showTechInfo ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                Información técnica
+              </button>
+
+              {showTechInfo && (
+                <div className="tech-info-section animate-fade-in">
+                  <div className="tech-info-row">
+                    <span className="tech-info-label">HASH SHA-256</span>
+                    <div className="cert-code-row">
+                      <span className="hash-display">{detailCert.hash_sha256 || '—'}</span>
+                      {detailCert.hash_sha256 && <CopyBtn text={detailCert.hash_sha256} title="Copiar hash SHA-256" />}
+                    </div>
+                  </div>
+                  <div className="tech-info-row">
+                    <span className="tech-info-label">Fecha de emisión (ISO)</span>
+                    <span className="text-mono">{detailCert.fecha_emision || '—'}</span>
+                  </div>
+                  <div className="tech-info-row">
+                    <span className="tech-info-label">ID interno</span>
+                    <span className="text-mono">{detailCert.id}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </Modal>
     </div>
   );

@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+let envUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+if (!envUrl.endsWith('/api')) envUrl += '/api';
+const API_BASE = envUrl;
 
 class ApiError extends Error {
   constructor(message, statusCode, data = null) {
@@ -43,10 +45,7 @@ const request = async (endpoint, options = {}) => {
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const config = {
-    method,
-    headers,
-  };
+  const config = { method, headers };
 
   if (body) {
     config.body = body instanceof FormData ? body : JSON.stringify(body);
@@ -54,42 +53,58 @@ const request = async (endpoint, options = {}) => {
 
   let res = await fetch(`${API_BASE}${endpoint}`, config);
 
-  // Auto-refresh on 401
   if (res.status === 401 && auth && getRefreshToken()) {
     if (!isRefreshing) {
       isRefreshing = true;
+      // Snapshot the refresh token so a concurrent new login doesn't get overwritten
+      const capturedRefreshToken = getRefreshToken();
       try {
         const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: getRefreshToken() }),
+          body: JSON.stringify({ refreshToken: capturedRefreshToken }),
         });
         const refreshData = await refreshRes.json();
         if (refreshRes.ok && refreshData.success) {
-          setTokens(refreshData.data.token, refreshData.data.refreshToken);
-          onRefreshed(refreshData.data.token);
+          // Only persist new tokens if no new login replaced them while we were refreshing
+          if (getRefreshToken() === capturedRefreshToken) {
+            setTokens(refreshData.data.token, refreshData.data.refreshToken);
+          }
+          const activeToken = getToken();
+          onRefreshed(activeToken);
           isRefreshing = false;
-          // Retry original request
-          headers['Authorization'] = `Bearer ${refreshData.data.token}`;
+          headers['Authorization'] = `Bearer ${activeToken}`;
           res = await fetch(`${API_BASE}${endpoint}`, { ...config, headers });
         } else {
+          refreshSubscribers = [];
           clearTokens();
           window.location.href = '/login';
           throw new ApiError('Sesión expirada', 401);
         }
       } catch (err) {
         isRefreshing = false;
+        refreshSubscribers = [];
         clearTokens();
         window.location.href = '/login';
         throw err;
       }
     } else {
-      // Wait for token refresh
-      return new Promise((resolve) => {
+      // Queue this request until the ongoing refresh completes
+      return new Promise((resolve, reject) => {
         addRefreshSubscriber(async (newToken) => {
-          headers['Authorization'] = `Bearer ${newToken}`;
-          const retryRes = await fetch(`${API_BASE}${endpoint}`, { ...config, headers });
-          resolve(retryRes);
+          try {
+            headers['Authorization'] = `Bearer ${newToken}`;
+            const retryRes = await fetch(`${API_BASE}${endpoint}`, { ...config, headers });
+            if (raw) { resolve(retryRes); return; }
+            const retryData = await retryRes.json();
+            if (!retryRes.ok || retryData.success === false) {
+              reject(new ApiError(retryData.message || 'Error desconocido', retryRes.status, retryData));
+            } else {
+              resolve(retryData);
+            }
+          } catch (err) {
+            reject(err);
+          }
         });
       });
     }

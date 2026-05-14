@@ -197,7 +197,7 @@
 .input-icon-right:hover { color: var(--color-text-main); }
 
 /* Legacy has-icon support */
-.input-wrapper.has-icon { position: relative; }
+.input-wrapper { position: relative; }
 .input-wrapper.has-icon .form-input { padding-left: 2.5rem; }
 .input-wrapper .input-icon {
   position: absolute;
@@ -272,18 +272,28 @@
 .demo-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .demo-btn-label { font-size: 0.8rem; }
 
-/* Back link */
+/* Back link — funciona tanto con <a> como con <button> */
 .auth-back-link {
+  display: block;
   text-align: center;
   margin-top: 1rem;
-}
-
-.auth-back-link a {
   color: var(--color-text-muted);
   font-size: 0.875rem;
   transition: color 0.2s;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  font-family: var(--font-sans);
 }
 
+.auth-back-link a {
+  color: inherit;
+  font-size: inherit;
+  transition: color 0.2s;
+}
+
+.auth-back-link:hover,
 .auth-back-link a:hover { color: var(--color-primary); }
 
 /* Alerts */
@@ -398,6 +408,62 @@
   flex: 1;
   height: 1px;
   background: rgba(255, 255, 255, 0.08);
+}
+
+/* Login: barra de intentos */
+.login-attempts-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+.login-attempts-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* Alert bloqueado */
+.alert-blocked {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+.alert-icon { font-size: 1rem; flex-shrink: 0; }
+
+/* Iconos izquierda en input */
+.input-icon-left {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.form-input.has-icon-left { padding-left: 2.4rem; }
+
+/* Paso TOTP */
+.totp-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  color: var(--color-primary);
+  margin: 0 auto 1.25rem;
+}
+
+.totp-input {
+  font-size: 1.35rem;
+  letter-spacing: 0.35em;
+  text-align: center;
+  font-family: monospace;
 }
 
 /* Responsive */

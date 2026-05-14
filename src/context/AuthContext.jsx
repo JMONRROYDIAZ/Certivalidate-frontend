@@ -1,60 +1,84 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { MOCK_CREDENTIALS, ROLE_PERMISSIONS } from '../utils/mockData';
+import { authApi } from '../api/auth.api';
+import { clearTokens } from '../api/_client';
 
 const AuthContext = createContext(null);
 
+const loadAccesos = () => {
+  try { return JSON.parse(localStorage.getItem('accesos') || '[]'); } catch { return []; }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('mock_user');
+    const saved = localStorage.getItem('user');
     return saved ? JSON.parse(saved) : null;
   });
+  const [accesos, setAccesos] = useState(loadAccesos);
+
+  const persistSession = (data) => {
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('refreshToken', data.refreshToken);
+    localStorage.setItem('user', JSON.stringify(data.usuario));
+    localStorage.setItem('accesos', JSON.stringify(data.accesos || []));
+    setUser(data.usuario);
+    setAccesos(data.accesos || []);
+  };
 
   const login = async (email, password) => {
-    // Simulate API delay
-    await new Promise(r => setTimeout(r, 600));
-    const entry = MOCK_CREDENTIALS[email];
-    if (!entry || entry.password !== password) {
-      throw new Error('Credenciales inválidas');
+    const data = await authApi.login(email, password);
+    if (data.requires2FA) {
+      return { requires2FA: true, partial_token: data.partial_token };
     }
-    localStorage.setItem('mock_user', JSON.stringify(entry.user));
-    setUser(entry.user);
-    return entry.user;
+    persistSession(data);
+    return data.usuario;
   };
 
-  const register = async (data) => {
-    await new Promise(r => setTimeout(r, 800));
-    // Simulate successful registration
-    return { success: true, message: 'Cuenta creada. Revisa tu correo para verificar.' };
+  const completeLogin2FA = async (partial_token, code) => {
+    const data = await authApi.verify2FA(partial_token, code);
+    persistSession(data);
+    return data.usuario;
   };
 
-  const logout = () => {
-    localStorage.removeItem('mock_user');
-    setUser(null);
+  const register = async (formData) => {
+    return await authApi.register(formData);
+  };
+
+  const logout = async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    try {
+      if (refreshToken) await authApi.logout(refreshToken);
+    } catch (_) {
+      // Si el servidor falla, cerramos sesión localmente igual
+    } finally {
+      clearTokens();
+      localStorage.removeItem('user');
+      localStorage.removeItem('accesos');
+      setUser(null);
+      setAccesos([]);
+    }
   };
 
   const updateProfile = async (data) => {
-    await new Promise(r => setTimeout(r, 500));
-    const updated = { ...user, ...data };
-    localStorage.setItem('mock_user', JSON.stringify(updated));
-    setUser(updated);
-    return updated;
+    const updated = await authApi.updatePerfil(data);
+    const merged = { ...user, ...updated };
+    localStorage.setItem('user', JSON.stringify(merged));
+    setUser(merged);
+    return merged;
   };
 
   const changePassword = async (currentPassword, newPassword) => {
-    await new Promise(r => setTimeout(r, 500));
-    logout();
-    return { message: 'Contraseña cambiada.' };
+    return await authApi.changePassword(currentPassword, newPassword);
   };
 
   const hasPermission = useCallback((permission) => {
-    if (!user?.rol) return false;
-    return (ROLE_PERMISSIONS[user.rol] || []).includes(permission);
-  }, [user]);
+    if (!user) return false;
+    return accesos.some(a => a.permisos?.includes(permission));
+  }, [user, accesos]);
 
   const loading = false;
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile, changePassword, hasPermission }}>
+    <AuthContext.Provider value={{ user, accesos, loading, login, completeLogin2FA, register, logout, updateProfile, changePassword, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

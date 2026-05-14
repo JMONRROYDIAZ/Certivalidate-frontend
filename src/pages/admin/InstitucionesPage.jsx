@@ -1,117 +1,101 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { MOCK_INSTITUCIONES } from '../../utils/mockData';
+import { institucionesApi } from '../../api/instituciones.api';
+import { useListPage } from '../../hooks/useListPage';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { Card } from '../../components/ui/Card';
-import { Plus, Pencil, Power } from 'lucide-react';
+import { InstitucionForm } from '../../forms/InstitucionForm';
+import { Plus, Pencil, Power, Zap } from 'lucide-react';
+import './InstitucionesPage.css';
+
+const INITIAL_FORM = { nombre: '', dominio: '', logo_url: '' };
 
 export const InstitucionesPage = () => {
   const { hasPermission } = useAuth();
-  const [instituciones, setInstituciones] = useState([...MOCK_INSTITUCIONES]);
 
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ nombre: '', dominio: '', logo_url: '' });
-  const [formError, setFormError] = useState('');
-
-  const openCreate = () => {
-    setEditing(null);
-    setForm({ nombre: '', dominio: '', logo_url: '' });
-    setFormError('');
-    setShowForm(true);
-  };
-
-  const openEdit = (inst) => {
-    setEditing(inst.id);
-    setForm({ nombre: inst.nombre, dominio: inst.dominio || '', logo_url: inst.logo_url || '' });
-    setFormError('');
-    setShowForm(true);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setFormError('');
-    await new Promise(r => setTimeout(r, 400));
-    if (editing) {
-      setInstituciones(prev => prev.map(i => i.id === editing ? { ...i, ...form } : i));
-    } else {
-      setInstituciones(prev => [...prev, {
-        id: `inst-${Date.now()}`,
-        ...form,
-        activa: true,
-        created_at: new Date().toISOString(),
-      }]);
-    }
-    setShowForm(false);
-  };
-
-  const handleDeactivate = (id) => {
-    if (!confirm('¿Desactivar esta institución?')) return;
-    setInstituciones(prev => prev.map(i => i.id === id ? { ...i, activa: false } : i));
-  };
-
-  const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+  const {
+    items: instituciones, loading, listError, load,
+    showForm, editing, form, setForm, formError,
+    openCreate, openEdit, closeForm, handleSubmit, handleRemove,
+  } = useListPage(institucionesApi, {
+    initialForm: INITIAL_FORM,
+    dataKey: 'data',
+    removeMethod: 'desactivar',
+    removeConfirmMsg: '¿Desactivar esta institución?',
+  });
 
   return (
     <div className="animate-fade-in">
       <div className="page-header">
-        <h1>Instituciones</h1>
-        <p>Gestiona las instituciones emisoras de certificados.</p>
+        <div>
+          <h1>Instituciones</h1>
+          <p>Gestiona las instituciones emisoras de certificados.</p>
+        </div>
       </div>
 
       <div className="page-toolbar">
         <span>{instituciones.length} institución(es)</span>
         {hasPermission('institucion:actualizar') && (
-          <Button variant="primary" icon={<Plus size={18} />} onClick={openCreate}>Nueva Institución</Button>
+          <Button variant="primary" icon={<Plus size={18} />} onClick={() => openCreate()}>
+            Nueva Institución
+          </Button>
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1rem' }}>
-        {instituciones.length === 0 ? (
-          <Card><div className="empty-state">No hay instituciones.</div></Card>
-        ) : instituciones.map(i => (
-          <Card key={i.id} glow>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.15rem' }}>{i.nombre}</h3>
-                {i.dominio && <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>{i.dominio}</p>}
-              </div>
-              <Badge variant={i.activa ? 'success' : 'muted'}>{i.activa ? 'Activa' : 'Inactiva'}</Badge>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-              {hasPermission('institucion:actualizar') && (
-                <button className="icon-btn" title="Editar" onClick={() => openEdit(i)}><Pencil size={16} /></button>
-              )}
-              {hasPermission('institucion:actualizar') && i.activa && (
-                <button className="icon-btn danger" title="Desactivar" onClick={() => handleDeactivate(i.id)}><Power size={16} /></button>
-              )}
-            </div>
-          </Card>
-        ))}
-      </div>
+      {listError && <div className="alert alert-error">{listError}</div>}
 
-      <Modal isOpen={showForm} onClose={() => setShowForm(false)} title={editing ? 'Editar Institución' : 'Nueva Institución'} size="md">
-        {formError && <div className="alert alert-error">{formError}</div>}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div className="form-group">
-            <label className="form-label">Nombre</label>
-            <input className="form-input" value={form.nombre} onChange={update('nombre')} required placeholder="Ej. Universidad Central" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Dominio (opcional)</label>
-            <input className="form-input" value={form.dominio} onChange={update('dominio')} placeholder="universidad.edu" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Logo URL (opcional)</label>
-            <input className="form-input" value={form.logo_url} onChange={update('logo_url')} placeholder="https://..." />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-            <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button type="submit" variant="primary">{editing ? 'Guardar' : 'Crear'}</Button>
-          </div>
-        </form>
+      {loading ? (
+        <div className="empty-state">Cargando...</div>
+      ) : (
+        <div className="cards-grid-lg">
+          {instituciones.length === 0 ? (
+            <Card><div className="empty-state">No hay instituciones.</div></Card>
+          ) : instituciones.map(i => (
+            <Card key={i.id} glow>
+              <div className="inst-card-header">
+                <div>
+                  <h3 className="inst-card-name">{i.nombre}</h3>
+                  {i.dominio && <p className="inst-card-domain">{i.dominio}</p>}
+                </div>
+                <Badge variant={i.activa ? 'success' : 'muted'}>{i.activa ? 'Activa' : 'Inactiva'}</Badge>
+              </div>
+              <div className="inst-integrations">
+                <span className="inst-integrations-label"><Zap size={12} /> Integraciones</span>
+                <div className="inst-integration-badges">
+                  <span className="inst-integration-item inst-integration-item--pending">API REST</span>
+                  <span className="inst-integration-item inst-integration-item--pending">Webhook</span>
+                  <span className="inst-integration-item inst-integration-item--pending">Email</span>
+                </div>
+              </div>
+              <div className="inst-card-actions">
+                {hasPermission('institucion:actualizar') && (
+                  <button className="icon-btn" title="Editar"
+                    onClick={() => openEdit(i, inst => ({ nombre: inst.nombre, dominio: inst.dominio || '', logo_url: inst.logo_url || '' }))}>
+                    <Pencil size={16} />
+                  </button>
+                )}
+                {hasPermission('institucion:actualizar') && i.activa && (
+                  <button className="icon-btn danger" title="Desactivar" onClick={() => handleRemove(i.id)}>
+                    <Power size={16} />
+                  </button>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Modal isOpen={showForm} onClose={closeForm} title={editing ? 'Editar Institución' : 'Nueva Institución'} size="md">
+        <InstitucionForm
+          form={form}
+          setForm={setForm}
+          onSubmit={handleSubmit}
+          onCancel={closeForm}
+          editing={!!editing}
+          error={formError}
+        />
       </Modal>
     </div>
   );

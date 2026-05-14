@@ -3,7 +3,9 @@
  */
 export const formatDate = (isoString) => {
   if (!isoString) return '—';
-  return new Date(isoString).toLocaleDateString('es-ES', {
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('es-ES', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -12,7 +14,9 @@ export const formatDate = (isoString) => {
 
 export const formatDateTime = (isoString) => {
   if (!isoString) return '—';
-  return new Date(isoString).toLocaleString('es-ES', {
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('es-ES', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',

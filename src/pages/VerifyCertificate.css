@@ -401,8 +401,207 @@
   line-height: 1.7;
 }
 
+/* ── Dropzone (tab archivo) ────────────────────── */
+.verify-file-area { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem; }
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  padding: 3rem 2rem;
+  border: 2px dashed rgba(255,255,255,0.15);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 180px;
+  position: relative;
+}
+.dropzone:hover, .dropzone.drag-over {
+  border-color: var(--color-primary);
+  background: rgba(0,240,255,0.04);
+}
+.dropzone-icon { color: var(--color-text-muted); }
+.dropzone-text { font-size: 0.95rem; color: var(--color-text-muted); line-height: 1.6; }
+.dropzone-text strong { color: var(--color-text-main); }
+.dropzone-spinner {
+  width: 28px; height: 28px;
+  border: 3px solid rgba(0,240,255,0.2);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  position: absolute;
+  bottom: 1rem;
+}
+
+/* ── Nuevos result cards ─────────────────────── */
+.result-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.75rem;
+  margin-top: 2rem;
+  text-align: left;
+}
+
+/* Colores por estado */
+.result-valido    { border-color: rgba(16,185,129,0.4);  box-shadow: 0 4px 32px rgba(16,185,129,0.08); }
+.result-revocado  { border-color: rgba(239,68,68,0.4);   box-shadow: 0 4px 32px rgba(239,68,68,0.08); }
+.result-alterado  { border-color: rgba(245,158,11,0.4);  box-shadow: 0 4px 32px rgba(245,158,11,0.08); }
+.result-inexistente { border-color: rgba(107,114,128,0.4); }
+
+.result-valido    .result-icon { color: #10b981; }
+.result-revocado  .result-icon { color: #ef4444; }
+.result-alterado  .result-icon { color: #f59e0b; }
+.result-inexistente .result-icon { color: #6b7280; }
+
+.result-valido    .result-title { color: #34d399; }
+.result-revocado  .result-title { color: #f87171; }
+.result-alterado  .result-title { color: #fcd34d; }
+.result-inexistente .result-title { color: #9ca3af; }
+
+.result-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.result-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.25rem; }
+.result-subtitle { font-size: 0.88rem; color: var(--color-text-muted); line-height: 1.5; }
+
+.result-data-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+.result-data-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.6rem 0.85rem;
+  background: rgba(255,255,255,0.03);
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+}
+.rd-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+.rd-mono { font-family: monospace; font-size: 0.85rem; }
+
+.result-info-note {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  background: rgba(255,255,255,0.03);
+  border-left: 3px solid rgba(255,255,255,0.12);
+  padding: 0.7rem 1rem;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  line-height: 1.55;
+}
+
+/* Sección técnica colapsable */
+.tech-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+  transition: color 0.15s;
+  align-self: flex-start;
+}
+.tech-toggle:hover { color: var(--color-text-main); }
+.result-tech-btn { margin-top: 0; }
+
+.result-tech-section {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.rd-tech-row { display: flex; flex-direction: column; gap: 0.2rem; }
+.rd-mono-sm { font-family: monospace; font-size: 0.75rem; color: var(--color-text-main); word-break: break-all; opacity: 0.8; }
+
+/* Blockchain section inside EstadoValido */
+.result-blockchain-section {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.blockchain-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #10b981;
+  font-size: 0.78rem;
+  font-weight: 600;
+  align-self: flex-start;
+}
+
+.blockchain-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-top: 0.25rem;
+}
+
+.blockchain-pending-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+  font-size: 0.78rem;
+  font-weight: 500;
+  align-self: flex-start;
+}
+
+/* Acciones del resultado */
+.result-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.btn-result-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.82rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+}
+.btn-result-secondary:hover { color: var(--color-text-main); border-color: rgba(255,255,255,0.25); }
+
 /* Responsive */
 @media (max-width: 600px) {
+  .result-data-grid { grid-template-columns: 1fr; }
   .landing-nav { padding: 0.8rem 1.25rem; }
   .nav-btn-ghost { display: none; }
   .hero-title { font-size: 2.6rem; }
